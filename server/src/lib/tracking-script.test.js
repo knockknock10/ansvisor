@@ -103,6 +103,25 @@ describe('the tracking snippet', () => {
     });
   });
 
+  it('marks ChatGPT Shopping when the landing URL has utm_medium=feed', () => {
+    const beacon = visit({
+      referrer: 'https://chatgpt.com/',
+      search: '?utm_source=chatgpt.com&utm_medium=feed',
+    });
+    expect(beacon).toMatchObject({ s: 'chatgpt.com', sf: 'shopping', v: AI_SOURCES_VERSION });
+  });
+
+  it('keeps untagged ChatGPT traffic on the plain surface', () => {
+    expect(visit({ referrer: 'https://chatgpt.com/' })).toMatchObject({
+      s: 'chatgpt.com',
+      sf: null,
+    });
+    expect(visit({ search: '?utm_source=chatgpt.com' })).toMatchObject({
+      s: 'chatgpt.com',
+      sf: null,
+    });
+  });
+
   it('counts a subdomain, and engines the old snippet missed', () => {
     expect(visit({ referrer: 'https://m.perplexity.ai/' }).s).toBe('perplexity.ai');
     expect(visit({ referrer: 'https://grok.com/' }).s).toBe('grok.com');
