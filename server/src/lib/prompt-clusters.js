@@ -205,6 +205,8 @@ const judgeSchema = z.object({
 
 const JUDGE_SYSTEM_PROMPT = `You decide which search queries belong in a content opportunity.
 
+Judge relevance against the brand's actual products and services, target customers, business model and conversion goals, not only words shared with the cluster.
+
 AI engines searched these queries while answering the cluster's prompts. Include a query when content written for the cluster's need should answer it and it matters to this brand's business. Exclude it when it is about something else that only shares words with the cluster (for example a product's pricing, news or an unrelated feature), or when it is relevant to the topic but not to what this brand offers.
 
 Queries that look up a competitor's or another vendor's product for the same need are relevant: content that compares the options has to answer them.
@@ -219,6 +221,10 @@ export async function judgeQueries(brand, cluster, prompts, queries) {
     prompt: `Brand: ${brand.name}
 Industry: ${brand.industry || 'Not specified'}
 About the brand: ${brand.description || 'Not specified'}
+Products and services: ${brand.products_and_services || 'Not specified'}
+Target customers: ${brand.target_customers || 'Not specified'}
+Business model: ${brand.business_model ? brand.business_model.replace(/_/g, ' ') : 'Not specified'}
+Conversion goals: ${(brand.conversion_goals || []).join(', ') || 'Not specified'}
 
 Cluster: ${cluster.label}
 Need: ${cluster.primary_intent}
@@ -411,7 +417,7 @@ async function refreshBaskets(brand, prompts) {
 export async function refreshPromptClusters(brandId) {
   const { data: brand } = await supabaseAdmin
     .from('brands')
-    .select('id, name, industry, description, language')
+    .select('id, name, industry, description, language, products_and_services, target_customers, business_model, conversion_goals')
     .eq('id', brandId)
     .single();
   if (!brand) return;
