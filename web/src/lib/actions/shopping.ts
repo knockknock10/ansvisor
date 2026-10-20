@@ -2,6 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { expandDateToEndOfDay } from '@/lib/dates';
+import {
+  detectAmazonShareDrop,
+  isAmazonHost,
+  merchantHost,
+  startOfUtcWeek,
+  type AmazonShareDropAlert,
+} from '@/lib/shopping-amazon-alert';
 
 /**
  * Server actions for the Shopping dashboard page. Reads from the
@@ -236,6 +243,73 @@ function cardsInWindow(
   if (filters.platforms?.length) query = query.in('platform', filters.platforms);
   if (filters.regions?.length) query = query.in('region', filters.regions);
   return query;
+}
+
+
+interface AmazonShareCardRow {
+  id: string;
+  created_at: string;
+  merchant_url: string | null;
+  merchant_domain: string | null;
+}
+
+/**
+ * Detect a sharp drop in the Amazon share of destinations for the brand's own
+ * products. This deliberately reads five UTC calendar weeks regardless of the
+ * selected date preset, because the rule needs the current week plus four full
+ * baseline weeks. Platform and region filters still apply.
+ */
+export async function getAmazonShareDropAlert(
+  brandId: string,
+  filters: ShoppingFilters,
+): Promise<AmazonShareDropAlert | null> {
+  const now = new Date();
+  const currentWeekStart = startOfUtcWeek(now);
+  const firstWeek = new Date(currentWeekStart + 'T00:00:00.000Z');
+  firstWeek.setUTCDate(firstWeek.getUTCDate() - 7 * 4);
+  const from = firstWeek.toISOString();
+  const supabase = await createClient();
+
+  const cards = await fetchAllCards<AmazonShareCardRow>(() => {
+    let query = supabase
+      .from('prompt_result_shopping_cards')
+      .select('id, created_at, merchant_url, merchant_domain')
+      .eq('brand_id', brandId)
+      .eq('matched_brand_role', 'own')
+      .gte('created_at', from)
+      .lte('created_at', now.toISOString());
+    if (filters.platforms?.length) query = query.in('platform', filters.platforms);
+    if (filters.regions?.length) query = query.in('region', filters.regions);
+    return query;
+  });
+
+  const counts = new Map<string, { amazonCards: number; classifiedCards: number }>();
+  for (let offset = 4; offset >= 0; offset -= 1) {
+    const week = new Date(currentWeekStart + 'T00:00:00.000Z');
+    week.setUTCDate(week.getUTCDate() - offset * 7);
+    counts.set(week.toISOString().slice(0, 10), { amazonCards: 0, classifiedCards: 0 });
+  }
+
+  for (const card of cards) {
+    const weekStart = startOfUtcWeek(new Date(card.created_at));
+    const bucket = counts.get(weekStart);
+    if (!bucket) continue;
+
+    // A valid merchant destination is classifiable (own store, marketplace or
+    // reseller); cards with no usable destination are excluded from the share.
+    const host = merchantHost(card.merchant_url, card.merchant_domain);
+    if (!host) continue;
+
+    bucket.classifiedCards += 1;
+    if (isAmazonHost(host)) bucket.amazonCards += 1;
+  }
+
+  const weeks = [...counts.entries()].map(([weekStart, count]) => ({
+    weekStart,
+    amazonShare: count.classifiedCards > 0 ? count.amazonCards / count.classifiedCards : 0,
+    classifiedCards: count.classifiedCards,
+  }));
+  return detectAmazonShareDrop(weeks);
 }
 
 const PRODUCT_CARD_COLUMNS = `
