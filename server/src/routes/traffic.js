@@ -3,7 +3,7 @@ import supabaseAdmin from '../config/supabase.js';
 import { trafficLimiter } from '../middleware/rate-limiter.js';
 import logger from '../lib/logger.js';
 import { findVisitOf } from '../lib/traffic-visits.js';
-import { AI_SOURCES_VERSION, classifyAiSource } from '../lib/ai-sources.js';
+import { AI_SOURCES_VERSION, classifyAiSource, classifyAiSurface } from '../lib/ai-sources.js';
 import { buildTrackingScript } from '../lib/tracking-script.js';
 
 const router = Router();
@@ -121,6 +121,15 @@ router.post('/track/:trackingCode', trafficLimiter, beaconBody, async (req, res)
     // Stored under the AI source list's key (AT-004): an older cached t.js
     // still sends the host it matched, like chat.openai.com for ChatGPT.
     const sourcePlatform = classifyAiSource(rawPlatform) ?? rawPlatform;
+    // The landing URL is authoritative: old cached snippets already send it,
+    // and the browser-provided surface marker is not trusted for attribution.
+    let sourceSurface = null;
+    try {
+      const landingUrl = new URL((typeof body.u === 'string' ? body.u : '').slice(0, 2048));
+      sourceSurface = classifyAiSurface(sourcePlatform, landingUrl.searchParams.get('utm_medium'));
+    } catch {
+      // A malformed or relative landing URL has no classified surface.
+    }
     // The list version that counted the visit; older snippets don't send one.
     const sourceListVersion =
       Number.isInteger(body.v) && body.v >= 1 && body.v <= AI_SOURCES_VERSION ? body.v : null;
@@ -160,7 +169,13 @@ router.post('/track/:trackingCode', trafficLimiter, beaconBody, async (req, res)
     // pageview is still stored, as a visit of its own.
     let visitOf = null;
     try {
-      visitOf = await findVisitOf({ brandId: brand.id, sourcePlatform, ipAddress, userAgent });
+      visitOf = await findVisitOf({
+        brandId: brand.id,
+        sourcePlatform,
+        sourceSurface,
+        ipAddress,
+        userAgent,
+      });
     } catch (err) {
       logger.warn({ err }, 'traffic visit lookup failed; stored as a new visit');
     }
@@ -170,6 +185,7 @@ router.post('/track/:trackingCode', trafficLimiter, beaconBody, async (req, res)
       url: (body.u || '').slice(0, 2048),
       referrer: (body.r || '').slice(0, 2048) || null,
       source_platform: sourcePlatform,
+      source_surface: sourceSurface,
       user_agent: userAgent,
       ip_address: ipAddress,
       country,
