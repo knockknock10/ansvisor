@@ -190,7 +190,9 @@ describe('mapAiTrafficRows', () => {
         brand_id: 'brand-1',
         date: '2026-07-21',
         source: 'chatgpt.com',
+        session_medium: '',
         platform: 'chatgpt.com',
+        source_surface: null,
         landing_page: '/pricing',
         landing_page_query: '/pricing?ref=x',
         sessions: 10,
@@ -265,6 +267,64 @@ describe('mapAiTrafficRows', () => {
     });
     // An assistant only GA4's channel knows, under its own name.
     expect(rows[1]).toMatchObject({ source: 'chat.mistral.ai', platform: 'chat.mistral.ai' });
+  });
+
+  it('separates feed-medium ChatGPT sessions and classifies only those as Shopping', () => {
+    const split = report({
+      dims: ['date', 'sessionSource', 'sessionMedium', 'landingPage', 'landingPagePlusQueryString'],
+      metrics: TRAFFIC_METRICS,
+      rows: [
+        [
+          '20260721',
+          'chatgpt.com',
+          'feed',
+          '/p',
+          '/p?utm_medium=feed',
+          '4',
+          '2',
+          '1',
+          '4',
+          '1',
+          '20',
+          '30',
+        ],
+        [
+          '20260721',
+          'chatgpt.com',
+          'text',
+          '/p',
+          '/p?utm_medium=text',
+          '6',
+          '3',
+          '0',
+          '6',
+          '0',
+          '0',
+          '50',
+        ],
+      ],
+    });
+
+    const rows = mapAiTrafficRows('brand-1', split);
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          session_medium: 'feed',
+          source_surface: 'shopping',
+          source: 'chatgpt.com',
+          platform: 'chatgpt.com',
+          sessions: 4,
+        }),
+        expect.objectContaining({
+          session_medium: 'text',
+          source_surface: null,
+          source: 'chatgpt.com',
+          platform: 'chatgpt.com',
+          sessions: 6,
+        }),
+      ]),
+    );
   });
 
   it('keeps the path separately from the full entry URL', () => {
