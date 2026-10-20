@@ -98,6 +98,10 @@ describe('merchantHost and isAmazonHost', () => {
     expect(merchantHost(null, 'www.amazon.co.uk')).toBe('amazon.co.uk');
   });
 
+  it('falls back to the merchant domain when the URL is malformed', () => {
+    expect(merchantHost('not a valid URL %%', 'www.amazon.co.uk')).toBe('amazon.co.uk');
+  });
+
   it('buckets dates by the Monday of their UTC week', () => {
     expect(startOfUtcWeek(new Date('2026-10-21T23:59:00.000Z'))).toBe('2026-10-19');
     expect(startOfUtcWeek(new Date('2026-10-25T23:59:00.000Z'))).toBe('2026-10-19');
