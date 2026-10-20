@@ -6,8 +6,9 @@ import { getOrgPlan } from '@/lib/guards/plan-guard';
 import { isWithinLimit } from '@/config/plans';
 import { slugify } from '@/lib/slug';
 import { API_BASE_URL } from '@/config/api';
-import type { Brand, BrandDomain, Industry } from '@/types';
+import type { Brand, BrandDomain, BusinessModel, ConversionGoal, Industry } from '@/types';
 import { MAX_PINNED_COMPETITORS } from '@/lib/insights-trend';
+import { BUSINESS_MODEL_VALUES, CONVERSION_GOAL_VALUES } from '@/config/brand-profile';
 
 function mapDomainRow(d: Record<string, unknown>): BrandDomain {
   return {
@@ -28,6 +29,17 @@ function mapBrandRow(brand: Record<string, unknown>, domains: Record<string, unk
     logoUrl: (brand.logo_url as string | null) ?? undefined,
     industry: (brand.industry as string | null) ?? undefined,
     description: (brand.description as string | null) ?? undefined,
+    productsAndServices: (brand.products_and_services as string | null) ?? undefined,
+    targetCustomers: (brand.target_customers as string | null) ?? undefined,
+    businessModel: BUSINESS_MODEL_VALUES.includes(brand.business_model as BusinessModel)
+      ? (brand.business_model as BusinessModel)
+      : undefined,
+    conversionGoals: Array.isArray(brand.conversion_goals)
+      ? (brand.conversion_goals as unknown[]).filter(
+          (goal): goal is ConversionGoal =>
+            typeof goal === 'string' && CONVERSION_GOAL_VALUES.includes(goal as ConversionGoal),
+        )
+      : [],
     region: (brand.region as string | null) ?? undefined,
     state: (brand.state as string | null) ?? undefined,
     language: (brand.language as string | null) ?? undefined,
@@ -159,9 +171,39 @@ interface UpdateBrandInput {
   logoUrl?: string | null;
   industry?: string | null;
   description?: string | null;
+  productsAndServices?: string | null;
+  targetCustomers?: string | null;
+  businessModel?: BusinessModel | null;
+  conversionGoals?: ConversionGoal[];
   region?: string;
   state?: string | null;
   language?: string;
+}
+
+export interface DraftBrandProfileResult {
+  profile: Partial<Pick<Brand, 'productsAndServices' | 'targetCustomers' | 'businessModel' | 'conversionGoals'>>;
+  complete?: boolean;
+}
+
+/** Ask the API to draft only blank profile fields from the stored site inventory. */
+export async function draftBrandProfile(brandId: string): Promise<DraftBrandProfileResult> {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated.');
+
+  const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/profile/draft`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    profile?: DraftBrandProfileResult['profile'];
+    complete?: boolean;
+    error?: string;
+  };
+  if (!response.ok) throw new Error(body.error || 'Could not draft the brand profile.');
+  return { profile: body.profile ?? {}, complete: Boolean(body.complete) };
 }
 
 export async function updateBrand(id: string, updates: UpdateBrandInput): Promise<Brand> {
@@ -175,6 +217,23 @@ export async function updateBrand(id: string, updates: UpdateBrandInput): Promis
   if ('logoUrl' in updates) payload.logo_url = updates.logoUrl ?? null;
   if ('industry' in updates) payload.industry = updates.industry ?? null;
   if ('description' in updates) payload.description = updates.description ?? null;
+  if ('productsAndServices' in updates) {
+    payload.products_and_services = updates.productsAndServices?.trim() || null;
+  }
+  if ('targetCustomers' in updates) {
+    payload.target_customers = updates.targetCustomers?.trim() || null;
+  }
+  if ('businessModel' in updates) {
+    payload.business_model =
+      updates.businessModel && BUSINESS_MODEL_VALUES.includes(updates.businessModel)
+        ? updates.businessModel
+        : null;
+  }
+  if ('conversionGoals' in updates) {
+    payload.conversion_goals = Array.from(
+      new Set((updates.conversionGoals ?? []).filter((goal) => CONVERSION_GOAL_VALUES.includes(goal))),
+    );
+  }
   if (updates.region !== undefined) payload.region = updates.region;
   if ('state' in updates) payload.state = updates.state ?? null;
   // A region change away from US invalidates any stored state.
