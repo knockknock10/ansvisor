@@ -104,25 +104,28 @@ export function merchantHost(
   merchantUrl: string | null | undefined,
   merchantDomain?: string | null,
 ): string | null {
-  const raw = (merchantUrl || merchantDomain || '').trim();
-  if (!raw) return null;
+  for (const candidate of [merchantUrl, merchantDomain]) {
+    const raw = (candidate ?? '').trim();
+    if (!raw) continue;
 
-  let parsed: URL;
-  try {
-    if (/^[a-z][a-z\d+.-]*:/i.test(raw)) {
-      parsed = new URL(raw);
-    } else if (raw.startsWith('//')) {
-      parsed = new URL(`https:${raw}`);
-    } else {
-      parsed = new URL(`https://${raw}`);
+    let parsed: URL;
+    try {
+      if (/^[a-z][a-z\\d+.-]*:/i.test(raw)) {
+        parsed = new URL(raw);
+      } else if (raw.startsWith('//')) {
+        parsed = new URL(`https:${raw}`);
+      } else {
+        parsed = new URL(`https://${raw}`);
+      }
+    } catch {
+      continue;
     }
-  } catch {
-    return null;
-  }
 
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-  const host = parsed.hostname.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
-  return host && host.includes('.') ? host : null;
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+    const host = parsed.hostname.toLowerCase().replace(/^www\\./, '').replace(/\\.$/, '');
+    if (host && host.includes('.')) return host;
+  }
+  return null;
 }
 
 export function isAmazonHost(host: string): boolean {
