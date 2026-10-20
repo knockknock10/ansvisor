@@ -19,7 +19,7 @@
 
 import supabaseAdmin from '../config/supabase.js';
 import { isComposioConfigured, runGaReport } from './composio.js';
-import { AI_SOURCES_VERSION } from './ai-sources.js';
+import { AI_SOURCES_VERSION, classifyAiSurface } from './ai-sources.js';
 import {
   GA_AI_ASSISTANT_CHANNEL,
   GA_AI_SOURCE_PATTERN,
@@ -173,21 +173,30 @@ export function mapAiTrafficRows(brandId, report) {
     const date = gaDateToIso(row.date);
     if (!date) continue;
     const source = row.sessionSource ?? '';
+    const sessionMedium = String(row.sessionMedium ?? '')
+      .trim()
+      .toLowerCase();
     const landingPageQuery = row.landingPagePlusQueryString ?? '';
     const metrics = trafficMetricColumns(row);
-    const key = `${date}|${source}|${landingPageQuery}`;
+    const key = `${date}|${source}|${sessionMedium}|${landingPageQuery}`;
     const seen = byKey.get(key);
     if (seen) {
       for (const column of SUMMED_COLUMNS) seen[column] += metrics[column];
       // Known to GA4's channel on either row is enough to name it.
       seen.platform ??= gaAiPlatform(source, row.sessionDefaultChannelGroup);
+      seen.source_surface ??= classifyAiSurface(seen.platform, sessionMedium);
       continue;
     }
     byKey.set(key, {
       brand_id: brandId,
       date,
       source,
+      session_medium: sessionMedium,
       platform: gaAiPlatform(source, row.sessionDefaultChannelGroup),
+      source_surface: classifyAiSurface(
+        gaAiPlatform(source, row.sessionDefaultChannelGroup),
+        sessionMedium,
+      ),
       // Path for joining the page totals, full URL for attribution.
       landing_page: row.landingPage ?? '',
       landing_page_query: landingPageQuery,
@@ -414,6 +423,7 @@ async function syncBrand(brand, { aiHistory = false } = {}) {
     dimensions: [
       { name: 'date' },
       { name: 'sessionSource' },
+      { name: 'sessionMedium' },
       { name: 'sessionDefaultChannelGroup' },
       { name: 'landingPage' },
       { name: 'landingPagePlusQueryString' },
@@ -427,7 +437,11 @@ async function syncBrand(brand, { aiHistory = false } = {}) {
   });
   const aiMapped = mapAiTrafficRows(brand.id, aiReport);
   if (aiMapped.length) {
-    await upsertAll('ga_ai_traffic_stats', aiMapped, 'brand_id,date,source,landing_page_query');
+    await upsertAll(
+      'ga_ai_traffic_stats',
+      aiMapped,
+      'brand_id,date,source,landing_page_query,session_medium',
+    );
   }
   const aiRows = aiMapped.length;
 
