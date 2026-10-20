@@ -4,9 +4,9 @@
  * The snippet sends a beacon on every AI-referred page load, so a reload or a
  * second link from the same answer arrives as another row. A visit is a
  * session, as Google Analytics counts one: the same visitor (IP address and
- * user agent) from the same AI platform, with less than VISIT_GAP_MINUTES
- * between pageviews. A different platform starts a new visit, as a new
- * traffic source starts a new session in GA4.
+ * user agent) from the same AI platform and same classified surface, with
+ * less than VISIT_GAP_MINUTES between pageviews. A platform or surface change
+ * starts a new visit, as the attribution source has changed.
  *
  * The answer is stored on the row as `visit_of` (migration 00172, which
  * grouped the rows stored before it with the same rule): null when the
@@ -28,6 +28,7 @@ export const VISIT_GAP_MINUTES = 30;
 export async function findVisitOf({
   brandId,
   sourcePlatform,
+  sourceSurface = null,
   ipAddress,
   userAgent,
   now = Date.now(),
@@ -35,11 +36,16 @@ export async function findVisitOf({
   if (!ipAddress || !userAgent) return null;
 
   const since = new Date(now - VISIT_GAP_MINUTES * 60_000).toISOString();
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('ai_traffic_logs')
     .select('id, visit_of')
     .eq('brand_id', brandId)
-    .eq('source_platform', sourcePlatform)
+    .eq('source_platform', sourcePlatform);
+  query =
+    sourceSurface === null
+      ? query.is('source_surface', null)
+      : query.eq('source_surface', sourceSurface);
+  const { data, error } = await query
     .eq('ip_address', ipAddress)
     .eq('user_agent', userAgent)
     .gt('created_at', since)
