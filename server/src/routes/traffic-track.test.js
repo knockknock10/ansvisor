@@ -99,6 +99,7 @@ describe('POST /track/:trackingCode', () => {
     expect(findVisitOf).toHaveBeenCalledWith({
       brandId: 'b1',
       sourcePlatform: 'gemini.google.com',
+      sourceSurface: null,
       ipAddress: '203.0.113.7',
       userAgent: 'Mozilla/5.0',
     });
@@ -141,6 +142,29 @@ describe('POST /track/:trackingCode', () => {
     expect(inserted[0].row.source_platform).toBe('chatgpt.com');
     // No list version from a snippet that predates it.
     expect(inserted[0].row.source_list_version).toBeNull();
+  });
+
+  it('stores a ChatGPT Shopping surface for a feed-tagged landing URL', async () => {
+    findVisitOf.mockResolvedValue(null);
+    await beacon({
+      u: 'https://acme.example/product?utm_source=chatgpt.com&utm_medium=feed',
+      s: 'chatgpt.com',
+      v: AI_SOURCES_VERSION,
+      // The server derives this from the URL instead of trusting a caller's marker.
+      sf: 'other',
+    });
+    expect(inserted[0].row).toMatchObject({
+      source_platform: 'chatgpt.com',
+      source_surface: 'shopping',
+      source_list_version: AI_SOURCES_VERSION,
+    });
+  });
+
+  it('does not create a Shopping surface for an untagged ChatGPT visit', async () => {
+    findVisitOf.mockResolvedValue(null);
+    await beacon({ s: 'chatgpt.com', u: 'https://acme.example/product?utm_source=chatgpt.com' });
+    expect(inserted[0].row.source_platform).toBe('chatgpt.com');
+    expect(inserted[0].row.source_surface).toBeNull();
   });
 
   it('stores the list version the snippet counted the visit with', async () => {
