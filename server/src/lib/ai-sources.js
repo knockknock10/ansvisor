@@ -71,6 +71,17 @@ export function classifyAiSource(raw, { origin = 'referrer' } = {}) {
   return null;
 }
 
+/** A named surface of a listed source, inferred from its UTM medium. */
+export function classifyAiSurface(sourceKey, medium) {
+  const key = normalizeSource(sourceKey);
+  const value = normalizeSource(medium);
+  if (!key || !value) return null;
+  const source = AI_SOURCES.find((item) => item.key === key);
+  return (
+    source?.surfaces?.find((surface) => normalizeSource(surface.utmMedium) === value)?.key ?? null
+  );
+}
+
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
