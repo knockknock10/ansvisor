@@ -11,6 +11,26 @@ export interface Organization {
   updatedAt: string;
 }
 
+export type BusinessModel =
+  | 'saas'
+  | 'e_commerce'
+  | 'marketplace'
+  | 'agency'
+  | 'local_business'
+  | 'publisher'
+  | 'nonprofit'
+  | 'other';
+
+export type ConversionGoal =
+  | 'sign_up'
+  | 'demo_request'
+  | 'purchase'
+  | 'lead_form'
+  | 'contact'
+  | 'subscribe'
+  | 'book_appointment'
+  | 'other';
+
 export interface Brand {
   id: string;
   organizationId: string;
@@ -19,6 +39,10 @@ export interface Brand {
   logoUrl?: string;
   industry?: string;
   description?: string;
+  productsAndServices?: string;
+  targetCustomers?: string;
+  businessModel?: BusinessModel;
+  conversionGoals?: ConversionGoal[];
   region?: string;
   /** Optional US state (USPS code) for state-level geo-targeting; US brands only (#554). */
   state?: string;
