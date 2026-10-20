@@ -68,6 +68,7 @@ vi.mock('@/hooks/use-feature-gate', () => ({
 
 const setBrandShoppingMode = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/actions/brand', () => ({
+  draftBrandProfile: vi.fn(),
   deleteBrand: vi.fn(),
   setBrandActive: vi.fn(),
   setBrandShoppingMode,
