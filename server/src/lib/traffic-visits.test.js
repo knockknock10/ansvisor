@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({ calls: [], result: { data: null, error: null } })
 // A query builder that records every filter and answers with db.result.
 vi.mock('../config/supabase.js', () => {
   const builder = {};
-  for (const method of ['select', 'eq', 'gt', 'order', 'limit']) {
+  for (const method of ['select', 'eq', 'is', 'gt', 'order', 'limit']) {
     builder[method] = (...args) => {
       db.calls.push([method, ...args]);
       return builder;
@@ -33,6 +33,7 @@ const NOW = Date.parse('2026-10-18T12:00:00.000Z');
 const pageview = {
   brandId: 'b1',
   sourcePlatform: 'gemini.google.com',
+  sourceSurface: null,
   ipAddress: '203.0.113.7',
   userAgent: 'Mozilla/5.0',
   now: NOW,
@@ -56,12 +57,19 @@ describe('findVisitOf', () => {
       ['select', 'id, visit_of'],
       ['eq', 'brand_id', 'b1'],
       ['eq', 'source_platform', 'gemini.google.com'],
+      ['is', 'source_surface', null],
       ['eq', 'ip_address', '203.0.113.7'],
       ['eq', 'user_agent', 'Mozilla/5.0'],
       ['gt', 'created_at', '2026-10-18T11:30:00.000Z'],
       ['order', 'created_at', { ascending: false }],
       ['limit', 1],
     ]);
+  });
+
+  it('scopes visit continuation to the same ChatGPT surface', async () => {
+    await findVisitOf({ ...pageview, sourcePlatform: 'chatgpt.com', sourceSurface: 'shopping' });
+    expect(db.calls).toContainEqual(['eq', 'source_surface', 'shopping']);
+    expect(db.calls).not.toContainEqual(['is', 'source_surface', null]);
   });
 
   it('continues the visit its latest pageview started', async () => {
