@@ -6,6 +6,7 @@ import {
   AI_SOURCE_CHANGES,
   aiSourcePattern,
   classifyAiSource,
+  classifyAiSurface,
 } from './ai-sources.js';
 
 /**
@@ -47,6 +48,17 @@ describe('classifyAiSource', () => {
     expect(classifyAiSource('')).toBeNull();
     expect(classifyAiSource(null)).toBeNull();
     expect(() => classifyAiSource('chatgpt.com', { origin: 'email' })).toThrow();
+  });
+});
+
+describe('classifyAiSurface', () => {
+  it('marks only ChatGPT links with utm_medium=feed as Shopping', () => {
+    expect(classifyAiSurface('chatgpt.com', 'feed')).toBe('shopping');
+    expect(classifyAiSurface('chatgpt.com', 'FEED')).toBe('shopping');
+    expect(classifyAiSurface('chatgpt.com', 'text')).toBeNull();
+    expect(classifyAiSurface('perplexity.ai', 'feed')).toBeNull();
+    expect(classifyAiSurface('unknown.example', 'feed')).toBeNull();
+    expect(classifyAiSurface('chatgpt.com', '')).toBeNull();
   });
 });
 
