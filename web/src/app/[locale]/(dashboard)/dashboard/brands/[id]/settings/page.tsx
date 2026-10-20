@@ -1,11 +1,12 @@
 'use client';
 
-import { use, useState, useEffect, useCallback } from 'react';
+import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter, Link } from '@/i18n/navigation';
 import { useBrandStore } from '@/stores/use-brand-store';
 import {
   updateBrand,
+  draftBrandProfile,
   deleteBrand,
   setBrandShoppingMode,
   setBrandActive,
@@ -14,7 +15,8 @@ import { syncDomains } from '@/lib/actions/brand-domain';
 import { getCompetitors, addCompetitor, deleteCompetitor } from '@/lib/actions/competitor';
 import { getFaviconUrl } from '@/lib/favicon';
 import type { Competitor } from '@/types';
-import { INDUSTRIES, type Brand, type BrandDomain } from '@/types';
+import { INDUSTRIES, type Brand, type BrandDomain, type BusinessModel, type ConversionGoal } from '@/types';
+import { BUSINESS_MODEL_OPTIONS, CONVERSION_GOAL_OPTIONS } from '@/config/brand-profile';
 import { REGIONS, REGION_ITEMS, US_STATES, US_STATE_ITEMS } from '@/config/prompt-options';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +45,7 @@ import {
   Plus,
   Save,
   ShoppingBag,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -63,6 +66,8 @@ interface PageProps {
 }
 
 const INDUSTRY_ITEMS = INDUSTRIES.map((industry) => ({ value: industry, label: industry }));
+
+type BrandProfileField = 'productsAndServices' | 'targetCustomers' | 'businessModel' | 'conversionGoals';
 
 export default function BrandSettingsPage({ params }: PageProps) {
   const { id } = use(params);
@@ -157,10 +162,74 @@ function GeneralTab({
   const [logoUrl, setLogoUrl] = useState(brand.logoUrl ?? '');
   const [industry, setIndustry] = useState(brand.industry ?? '');
   const [description, setDescription] = useState(brand.description ?? '');
+  const [productsAndServices, setProductsAndServices] = useState(brand.productsAndServices ?? '');
+  const [targetCustomers, setTargetCustomers] = useState(brand.targetCustomers ?? '');
+  const [businessModel, setBusinessModel] = useState<BusinessModel | ''>(brand.businessModel ?? '');
+  const [conversionGoals, setConversionGoals] = useState<ConversionGoal[]>(brand.conversionGoals ?? []);
+  const [isDraftingProfile, setIsDraftingProfile] = useState(false);
+  const editedProfileFields = useRef(new Set<BrandProfileField>());
   const [region, setRegion] = useState(brand.region ?? 'US');
   const [usState, setUsState] = useState(brand.state ?? '');
   const [isSaving, setIsSaving] = useState(false);
   const stateItems = [{ value: 'nationwide', label: t('settings.nationwide') }, ...US_STATE_ITEMS];
+  const businessModelItems = BUSINESS_MODEL_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.label),
+  }));
+  const conversionGoalItems = CONVERSION_GOAL_OPTIONS.map((option) => ({
+    ...option,
+    text: t(option.label),
+  }));
+
+  const handleDraftProfile = async () => {
+    setIsDraftingProfile(true);
+    try {
+      const result = await draftBrandProfile(brand.id);
+      if (result.complete) {
+        toast.success(t('settings.profileComplete'));
+        return;
+      }
+
+      const profile = result.profile;
+      const edited = editedProfileFields.current;
+      let filled = false;
+
+      if (
+        !edited.has('productsAndServices') &&
+        !productsAndServices.trim() &&
+        profile.productsAndServices?.trim()
+      ) {
+        setProductsAndServices(profile.productsAndServices);
+        filled = true;
+      }
+      if (
+        !edited.has('targetCustomers') &&
+        !targetCustomers.trim() &&
+        profile.targetCustomers?.trim()
+      ) {
+        setTargetCustomers(profile.targetCustomers);
+        filled = true;
+      }
+      if (!edited.has('businessModel') && !businessModel && profile.businessModel) {
+        setBusinessModel(profile.businessModel);
+        filled = true;
+      }
+      if (
+        !edited.has('conversionGoals') &&
+        conversionGoals.length === 0 &&
+        profile.conversionGoals?.length
+      ) {
+        setConversionGoals(profile.conversionGoals);
+        filled = true;
+      }
+
+      toast.success(t(filled ? 'settings.profileDrafted' : 'settings.profileNoSuggestions'));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('settings.profileDraftFailed'));
+    } finally {
+      setIsDraftingProfile(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -173,6 +242,10 @@ function GeneralTab({
         logoUrl: trimmedLogoUrl || null,
         industry: industry || null,
         description: description || null,
+        productsAndServices: productsAndServices.trim() || null,
+        targetCustomers: targetCustomers.trim() || null,
+        businessModel: businessModel || null,
+        conversionGoals,
         region,
         state: region === 'US' ? usState || null : null,
       });
@@ -182,6 +255,10 @@ function GeneralTab({
         logoUrl: updated.logoUrl,
         industry: updated.industry,
         description: updated.description,
+        productsAndServices: updated.productsAndServices,
+        targetCustomers: updated.targetCustomers,
+        businessModel: updated.businessModel,
+        conversionGoals: updated.conversionGoals,
         region: updated.region,
         state: updated.state,
         updatedAt: updated.updatedAt,
@@ -256,6 +333,117 @@ function GeneralTab({
             rows={3}
           />
         </div>
+
+        <Separator />
+
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold">{t('settings.profileTitle')}</h3>
+              <p className="text-sm text-muted-foreground">{t('settings.profileDescription')}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              onClick={handleDraftProfile}
+              disabled={isDraftingProfile || isSaving}
+            >
+              {isDraftingProfile ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {isDraftingProfile ? t('settings.draftingProfile') : t('settings.draftProfile')}
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="products-and-services">{t('settings.productsAndServices')}</Label>
+            <Textarea
+              id="products-and-services"
+              value={productsAndServices}
+              maxLength={2400}
+              rows={3}
+              placeholder={t('settings.productsAndServicesPlaceholder')}
+              onChange={(event) => {
+                editedProfileFields.current.add('productsAndServices');
+                setProductsAndServices(event.target.value);
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="target-customers">{t('settings.targetCustomers')}</Label>
+            <Textarea
+              id="target-customers"
+              value={targetCustomers}
+              maxLength={1600}
+              rows={2}
+              placeholder={t('settings.targetCustomersPlaceholder')}
+              onChange={(event) => {
+                editedProfileFields.current.add('targetCustomers');
+                setTargetCustomers(event.target.value);
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="business-model">{t('settings.businessModel')}</Label>
+            <Select
+              items={businessModelItems}
+              value={businessModel}
+              onValueChange={(value) => {
+                editedProfileFields.current.add('businessModel');
+                setBusinessModel(
+                  BUSINESS_MODEL_OPTIONS.some((option) => option.value === value)
+                    ? (value as BusinessModel)
+                    : '',
+                );
+              }}
+            >
+              <SelectTrigger id="business-model">
+                <SelectValue placeholder={t('settings.businessModelPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {businessModelItems.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">{t('settings.conversionGoals')}</legend>
+            <p className="text-xs text-muted-foreground">{t('settings.conversionGoalsHint')}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {conversionGoalItems.map((option) => (
+                <div key={option.value} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`conversion-goal-${option.value}`}
+                    checked={conversionGoals.includes(option.value)}
+                    onCheckedChange={(checked) => {
+                      editedProfileFields.current.add('conversionGoals');
+                      setConversionGoals((current) =>
+                        checked === true
+                          ? Array.from(new Set([...current, option.value]))
+                          : current.filter((goal) => goal !== option.value),
+                      );
+                    }}
+                  />
+                  <Label
+                    htmlFor={`conversion-goal-${option.value}`}
+                    className="cursor-pointer font-normal"
+                  >
+                    {option.text}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        </section>
 
         <div className="space-y-2">
           <Label>{t('settings.region')}</Label>
