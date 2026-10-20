@@ -31,12 +31,14 @@ import {
   Search,
   Calendar,
   Globe,
+  AlertTriangle,
 } from 'lucide-react';
 import { useBrandStore } from '@/stores/use-brand-store';
 import { useFeatureGate } from '@/hooks/use-feature-gate';
 import {
   getShoppingFilterOptions,
   getShoppingOverview,
+  getAmazonShareDropAlert,
   getOwnProducts,
   getCompetitorProducts,
   getCompetitorSummary,
@@ -45,6 +47,7 @@ import {
   type ShoppingDatePreset,
   type ShoppingFilters,
   type ShoppingKpis,
+  type AmazonShareDropAlert,
   type ShoppingProduct,
   type CompetitorShoppingSummary,
   type CardEligiblePromptRow,
@@ -119,6 +122,7 @@ export default function ShoppingPage() {
   });
   const [kpis, setKpis] = useState<ShoppingKpis | null>(null);
   const [charts, setCharts] = useState<ShoppingChartData | null>(null);
+  const [amazonShareAlert, setAmazonShareAlert] = useState<AmazonShareDropAlert | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [ownProducts, setOwnProducts] = useState<ShoppingProduct[]>([]);
@@ -177,6 +181,7 @@ export default function ShoppingPage() {
           getCompetitorProducts(activeBrandId, filters),
           getCompetitorSummary(activeBrandId, filters),
           getCardEligiblePrompts(activeBrandId, filters),
+          getAmazonShareDropAlert(activeBrandId, filters),
         );
       }
 
@@ -186,11 +191,14 @@ export default function ShoppingPage() {
         const overview = results[0] as { kpis: ShoppingKpis; charts: ShoppingChartData };
         setKpis(overview.kpis);
         setCharts(overview.charts);
-        if (hasFullAccess && results.length >= 5) {
+        if (hasFullAccess && results.length >= 6) {
           setOwnProducts(results[1] as ShoppingProduct[]);
           setCompetitorProducts(results[2] as ShoppingProduct[]);
           setCompetitorSummary(results[3] as CompetitorShoppingSummary[]);
           setPromptsData(results[4] as CardEligiblePromptsResponse);
+          setAmazonShareAlert(results[5] as AmazonShareDropAlert | null);
+        } else {
+          setAmazonShareAlert(null);
         }
       }
     } finally {
@@ -257,6 +265,29 @@ export default function ShoppingPage() {
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
+              {hasFullAccess && amazonShareAlert && (
+                <Card
+                  role="status"
+                  aria-live="polite"
+                  className="border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/20"
+                >
+                  <CardContent className="flex items-start gap-3 p-4">
+                    <AlertTriangle
+                      className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400"
+                      aria-hidden="true"
+                    />
+                    <div className="space-y-1">
+                      <p className="font-medium">{t('amazonShareDropTitle')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('amazonShareDropAlert', {
+                          from: Math.round(amazonShareAlert.baselineShare * 100),
+                          to: Math.round(amazonShareAlert.currentShare * 100),
+                        })}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {hasFullAccess ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   <PlatformCardRateChart
