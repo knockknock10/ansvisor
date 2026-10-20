@@ -40,6 +40,11 @@ export function snippetSources() {
     a: source.aliases,
     ...(source.referrerPath ? { p: source.referrerPath } : {}),
     ...(source.utm === false ? { u: 0 } : {}),
+    ...(source.surfaces?.length
+      ? {
+          m: Object.fromEntries(source.surfaces.map((surface) => [surface.utmMedium, surface.key])),
+        }
+      : {}),
   }));
 }
 
@@ -63,6 +68,14 @@ return"";
 var pf=m(h,false);
 if(!pf){try{pf=m(new URLSearchParams(location.search).get("utm_source"),true)}catch(e){}}
 if(!pf)return;
+var sf="";
+try{
+var medium=new URLSearchParams(location.search).get("utm_medium");
+if(medium){
+medium=String(medium).replace(/^\\s+|\\s+$/g,"").toLowerCase();
+for(var i=0;i<S.length;i++){if(S[i].k===pf){sf=(S[i].m||{})[medium]||"";break}}
+}
+}catch(e){}
 window.__at=1;
 var c=document.currentScript,k=c.getAttribute("data-t"),o=c.src.replace(/\\/t\\.js(\\?.*)?$/,"");
 var u=location.href,st=0,x=o+"/track/"+k;
@@ -77,7 +90,7 @@ if(!st)return /(^|[^0-9])404([^0-9]|$)|not found/i.test(ti)?1:0;
 return st>199&&st<300&&/(^|[|:\\u00b7\\u2022\\u2013\\u2014-]\\s*)(404 page not found|404 not found|404 error|error 404|page not found|not found|404)\\s*([|:\\u00b7\\u2022\\u2013\\u2014-]|$)/i.test(ti)?1:0;
 }
 var nf=nfOf(document.title||"");
-post({u:u,r:r,s:pf,v:V,a:navigator.userAgent,t:Date.now(),l:navigator.language,d:screen.width+"x"+screen.height,st:st,nf:nf});
+post({u:u,r:r,s:pf,sf:sf||null,v:V,a:navigator.userAgent,t:Date.now(),l:navigator.language,d:screen.width+"x"+screen.height,st:st,nf:nf});
 if(!nf&&(!st||st>199&&st<300)){
 var again=function(){setTimeout(function(){if(nfOf(document.title||""))post({k:"nf",u:u,s:pf,a:navigator.userAgent,st:st})},1500)};
 if(document.readyState==="complete")again();else window.addEventListener("load",again);
