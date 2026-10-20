@@ -69,6 +69,7 @@ Rules:
 - Be concrete and actionable, and reference the data: volume, visibility, the strongest competitor's visibility, competitors.
 - Categorize as "owned" (content the brand controls) or "earned" (third-party content, PR, reviews).
 - Existing opportunities from other topics are listed. If a cluster needs the same content as one of them — the same user need and the same piece of content, answering the cluster's prompts without becoming a different page — set sameAs to its bracketed E index. Otherwise set sameAs to null. Sharing words, a topic or a product category is not enough.
+- Use the brand's products and services, target customers, business model and conversion goals when choosing the audience, opportunity and primary/supporting asset types. Do not recommend a purchase-led asset unless the profile supports purchase as a goal.
 - Decide what the content is, given the brand's pages listed under each cluster:
   - create: no listed page answers this need. Write a new page.
   - optimize: a listed page already targets this need. Make it the answer AI engines pick: structure, evidence, direct answers, FAQ.
@@ -309,7 +310,7 @@ export async function generateContentOpportunities(
 
   const { data: brand } = await supabaseAdmin
     .from('brands')
-    .select('id, name, industry, language, organization_id')
+    .select('id, name, industry, description, language, products_and_services, target_customers, business_model, conversion_goals, organization_id')
     .eq('id', brandId)
     .single();
   if (!brand) return { generated: 0, merged: 0 };
@@ -528,6 +529,11 @@ ${pages.map(pageLine).join('\n') || 'none found'}`;
 
   const userPrompt = `Brand: ${brand.name}
 Industry: ${brand.industry || 'Not specified'}
+Description: ${brand.description || 'Not specified'}
+Products and services: ${brand.products_and_services || 'Not specified'}
+Target customers: ${brand.target_customers || 'Not specified'}
+Business model: ${brand.business_model ? brand.business_model.replace(/_/g, ' ') : 'Not specified'}
+Conversion goals: ${(brand.conversion_goals || []).join(', ') || 'Not specified'}
 Domain: ${(domainsRes.data || []).map((d) => d.domain).join(', ') || 'N/A'}
 
 Clusters (highest opportunity first):
