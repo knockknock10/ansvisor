@@ -15,6 +15,15 @@ import { refreshSitePages } from '../lib/site-pages.js';
 import { updateTargetUrlStats } from '../lib/target-url-stats.js';
 import { persistCitationRows } from '../lib/citation-rows.js';
 import { parseLocation, locationsForScraper } from '../lib/locations.js';
+import { regionToLocationCode, languageToCode, defaultLanguageForRegion } from '../lib/dataforseo-codes.js';
+import { persistShoppingCards } from '../lib/cloro-result-handler.js';
+import {
+  calculateGoogleShoppingAppearance,
+  extractGoogleShoppingProducts,
+  hasGoogleShoppingCredentials,
+  submitGoogleShoppingTasks,
+  waitForGoogleShoppingTask,
+} from '../lib/google-shopping.js';
 import { settleTrackingRun } from '../lib/run-settlement.js';
 import logger from '../lib/logger.js';
 
@@ -69,6 +78,83 @@ export function runnablePlatforms(platforms, { shoppingEnabled } = {}) {
 export function shoppingTracked(brand, plan) {
   return Boolean(brand?.shopping_mode_enabled) && (!plan || hasFeature(plan, 'shopping_analytics'));
 }
+
+/**
+ * Repeated Google Shopping observations per prompt and country.
+ * Keep the range bounded so a bad deployment value cannot cause runaway API
+ * spend. Missing or invalid configuration uses the documented default of 3.
+ */
+export function googleShoppingRunCount(value = process.env.GOOGLE_SHOPPING_RUNS) {
+  if (value == null || String(value).trim() === '') return 3;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 10 ? parsed : 3;
+}
+
+/**
+ * Build one country-level Google Shopping task per eligible run. The Google
+ * Shopping API accepts country targeting, not US state targeting, so US-CA
+ * and US-NY are collapsed to one US query for a given prompt.
+ */
+export function buildGoogleShoppingTaskPlan(
+  prompts,
+  { enabled, hasCredentials, brandLanguage, runs = 3 } = {},
+) {
+  if (!enabled || !hasCredentials || !Array.isArray(prompts)) return [];
+  const runCount = googleShoppingRunCount(runs);
+  const tasks = [];
+
+  for (const prompt of prompts) {
+    if (!Array.isArray(prompt?.platforms) || !prompt.platforms.includes('chatgpt-shopping')) {
+      continue;
+    }
+    const keyword = typeof prompt.text === 'string' ? prompt.text.trim() : '';
+    if (!keyword || keyword.length > 700) continue;
+
+    const countries = new Set();
+    for (const code of Array.isArray(prompt.regions) ? prompt.regions : []) {
+      const { country } = parseLocation(code);
+      if (country && regionToLocationCode(country)) countries.add(country);
+    }
+
+    for (const country of countries) {
+      const locationCode = regionToLocationCode(country);
+      const languageCode =
+        languageToCode(brandLanguage) ?? defaultLanguageForRegion(country) ?? 'en';
+      for (let runIndex = 1; runIndex <= runCount; runIndex += 1) {
+        tasks.push({
+          prompt,
+          promptId: prompt.id,
+          keyword,
+          region: country,
+          locationCode,
+          languageCode,
+          runIndex,
+          tag: `ansvisor:${prompt.id}:${country}:${runIndex}`,
+        });
+      }
+    }
+  }
+
+  return tasks;
+}
+
+/** Bounded concurrency for provider task polling. */
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= items.length) return;
+        results[index] = await mapper(items[index], index);
+      }
+    }),
+  );
+  return results;
+}
+
 
 /**
  * PostgREST silently caps an un-paginated select at 1000 rows, so reading a
@@ -177,7 +263,7 @@ export async function processTrackingJob({ brandId, promptId, promptIds, source,
     .from('brands')
     // `state` is deliberately not read: it is the default location offered
     // when new prompts are created, not a tracking-time override (#691).
-    .select('id, name, organization_id, shopping_mode_enabled')
+    .select('id, name, organization_id, shopping_mode_enabled, language')
     .eq('id', brandId)
     .single();
   if (brandErr || !brand) throw new Error(`Brand not found: ${brandId}`);
@@ -310,11 +396,58 @@ export async function processTrackingJob({ brandId, promptId, promptIds, source,
   const locationsFor = (prompt) =>
     prompt.regions && prompt.regions.length > 0 ? prompt.regions : [null];
 
+  // Google Shopping is an additional shopping-only signal, not an AI engine
+  // users can add to a prompt. It is plan-gated with Shopping mode and uses
+  // only the prompt's explicit countries. Repetitions count toward run progress.
+  const googleShoppingCredentials = hasGoogleShoppingCredentials();
+  const googleShoppingTasks = buildGoogleShoppingTaskPlan(prompts, {
+    enabled: shoppingEnabled,
+    hasCredentials: googleShoppingCredentials,
+    brandLanguage: brand.language,
+    runs: googleShoppingRunCount(),
+  });
+  if (shoppingEnabled && !googleShoppingCredentials) {
+    logger.warn(
+      { brandId },
+      'Google Shopping skipped: DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD are not configured',
+    );
+  }
+  if (shoppingEnabled && googleShoppingCredentials) {
+    const shoppingPrompts = prompts.filter((prompt) =>
+      Array.isArray(prompt.platforms) && prompt.platforms.includes('chatgpt-shopping'),
+    );
+    for (const prompt of shoppingPrompts) {
+      if (!Array.isArray(prompt.regions) || prompt.regions.length === 0) {
+        logger.warn(
+          { brandId, promptId: prompt.id },
+          'Google Shopping skipped for an untargeted prompt: a country is required',
+        );
+      } else if (typeof prompt.text !== 'string' || !prompt.text.trim()) {
+        logger.warn({ brandId, promptId: prompt.id }, 'Google Shopping skipped for an empty prompt');
+      } else if (prompt.text.trim().length > 700) {
+        logger.warn(
+          { brandId, promptId: prompt.id, queryLength: prompt.text.trim().length },
+          'Google Shopping skipped: DataForSEO keywords are limited to 700 characters',
+        );
+      } else if (
+        !prompt.regions.some((code) => {
+          const { country } = parseLocation(code);
+          return Boolean(country && regionToLocationCode(country));
+        })
+      ) {
+        logger.warn(
+          { brandId, promptId: prompt.id, regions: prompt.regions },
+          'Google Shopping skipped: no prompt country has a DataForSEO location mapping',
+        );
+      }
+    }
+  }
+
   // 4. Count total tasks: one per prompt × engine × location that engine can
   // actually run. Google AIO / AI Mode have no sub-country mechanism, so
   // their state locations collapse to one country-wide task — counting them
   // per state would promise the progress bar work that is never submitted.
-  let totalTasks = 0;
+  let totalTasks = googleShoppingTasks.length;
   for (const prompt of prompts) {
     const locations = locationsFor(prompt);
     totalTasks += allowedModelsFor(prompt).length * locations.length;
@@ -352,6 +485,7 @@ export async function processTrackingJob({ brandId, promptId, promptIds, source,
       createdAt: inserted.created_at,
       citations: row.citations,
     });
+    return inserted;
   }
 
   // 6. Phase 1: Collect & run all scraper (platform) tasks first
@@ -843,6 +977,162 @@ export async function processTrackingJob({ brandId, promptId, promptIds, source,
         }
       }),
     );
+  }
+
+  // 7b. Fetch Google Shopping as a separate, country-specific signal.
+  // DataForSEO bills task submission, not result retrieval; log every POST
+  // using the provider's returned request-level cost rather than estimating it.
+  if (googleShoppingTasks.length > 0) {
+    logger.info(
+      {
+        brandId,
+        tasks: googleShoppingTasks.length,
+        runsPerPromptCountry: googleShoppingRunCount(),
+      },
+      'submitting Google Shopping tasks to DataForSEO',
+    );
+
+    let submittedTasks;
+    try {
+      const submission = await submitGoogleShoppingTasks(googleShoppingTasks, {
+        onRequest: (request) => {
+          logger.info(
+            {
+              brandId,
+              provider: 'dataforseo-google-shopping',
+              requestCostUsd: request.cost,
+              tasksCount: request.tasksCount,
+              tasksError: request.tasksError,
+              statusCode: request.statusCode,
+              error: request.error,
+            },
+            'DataForSEO Google Shopping task submission cost',
+          );
+        },
+      });
+      submittedTasks = submission.tasks;
+    } catch (err) {
+      logger.error({ err, brandId }, 'Google Shopping task submission failed');
+      submittedTasks = googleShoppingTasks.map((task) => ({
+        ...task,
+        id: null,
+        error: err instanceof Error ? err.message : String(err),
+        taskCost: null,
+      }));
+    }
+
+    const taskResults = await mapWithConcurrency(submittedTasks, 4, async (task) => {
+      if (!task.id || task.error) {
+        return { ...task, success: false, products: [], error: task.error || 'Task was not accepted' };
+      }
+      try {
+        const result = await waitForGoogleShoppingTask(task.id);
+        return { ...task, success: true, products: extractGoogleShoppingProducts(result), error: null };
+      } catch (err) {
+        return {
+          ...task,
+          success: false,
+          products: [],
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    });
+
+    // Compare products within each prompt-country series. Failed provider
+    // tasks do not count as empty-result observations; a successful zero-card
+    // response does count as a run with no appearances.
+    const byPromptCountry = new Map();
+    for (const result of taskResults) {
+      const key = `${result.promptId}\u0000${result.region}`;
+      if (!byPromptCountry.has(key)) byPromptCountry.set(key, []);
+      byPromptCountry.get(key).push(result);
+    }
+
+    for (const runs of byPromptCountry.values()) {
+      const { successfulRunCount, annotatedRuns } = calculateGoogleShoppingAppearance(runs);
+      for (const result of annotatedRuns) {
+        completedTasks += 1;
+        if (!result.success) {
+          logger.warn(
+            {
+              err: result.error,
+              brandId,
+              promptId: result.promptId,
+              region: result.region,
+              runIndex: result.runIndex,
+              taskCostUsd: result.taskCost,
+            },
+            'Google Shopping task failed',
+          );
+        } else {
+          try {
+            const productCards = result.products;
+            const inserted = await insertResult({
+              prompt_id: result.promptId,
+              brand_id: brandId,
+              platform: 'google-shopping',
+              response: `Google Shopping products for "${result.keyword}" in ${result.region}.`,
+              citations: [],
+              mention_count: 0,
+              citation_count: 0,
+              sentiment: 'neutral',
+              visibility_score: 0,
+              model_used: 'dataforseo-google-shopping',
+              region: result.region,
+              competitor_mentions: [],
+              mention_position: null,
+              mentioned_entity_count: 0,
+              shopping_cards: productCards,
+              inline_products: [],
+              search_queries: [],
+            });
+
+            await persistShoppingCards({
+              promptResultId: inserted.id,
+              brandId,
+              platform: 'google-shopping',
+              region: result.region,
+              rawCards: productCards,
+              brandInfo: {
+                brandId,
+                brandName: brandInfo.brandName,
+                domains: brandInfo.domains,
+              },
+              competitors,
+            });
+
+            logger.info(
+              {
+                brandId,
+                promptId: result.promptId,
+                region: result.region,
+                runIndex: result.runIndex,
+                successfulRunCount,
+                productCount: productCards.length,
+                taskCostUsd: result.taskCost,
+              },
+              'Google Shopping results stored',
+            );
+          } catch (err) {
+            logger.error(
+              { err, brandId, promptId: result.promptId, region: result.region, runIndex: result.runIndex },
+              'failed to persist Google Shopping results',
+            );
+          }
+        }
+
+        if (job) {
+          job.progress({
+            current: completedTasks,
+            total: totalTasks,
+            promptText: result.keyword.slice(0, 80),
+            model: 'dataforseo-google-shopping',
+            region: result.region,
+            platform: 'google-shopping',
+          });
+        }
+      }
+    }
   }
 
   logger.info({ brandId, resultCount: insertedCount }, 'tracking results stored');
