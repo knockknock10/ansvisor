@@ -139,7 +139,14 @@ function matchProducts(chatgptProducts, googleProducts) {
     }
   }
 
-  return { chatgptProducts: left, googleProducts: right, matches };
+  const matchedChatgpt = new Set(matches.map((pair) => pair.chatgpt));
+  return {
+    chatgptProducts: left,
+    googleProducts: right,
+    matches,
+    unmatchedChatgptProducts: left.filter((product) => !matchedChatgpt.has(product)),
+    unmatchedGoogleProducts: right.filter((product, index) => !consumedGoogle.has(index)),
+  };
 }
 
 function escapeMarkdown(value) {
@@ -201,19 +208,39 @@ function buildReport({ country, language, prompts, measurements, cost }) {
     lines.push(`**${item.index}. ${escapeMarkdown(item.query)}**`);
     if (item.error) {
       lines.push(`- Lookup failed: ${escapeMarkdown(item.error)}`);
-    } else if (item.matches.length === 0) {
-      lines.push('- No product matches under the stated identity rules.');
-    } else {
-      for (const pair of item.matches) {
-        const chatTitle = pair.chatgpt.title ?? pair.chatgpt.name ?? pair.chatgpt.product_title ?? '(untitled)';
-        const googleTitle = pair.google.title ?? '(untitled)';
-        const chatMerchant = pair.chatgpt.merchant ?? pair.chatgpt.merchants ?? pair.chatgpt.seller ?? '(unknown merchant)';
-        const googleMerchant = pair.google.seller ?? pair.google.domain ?? '(unknown merchant)';
-        lines.push(
-          `- ChatGPT: ${escapeMarkdown(chatTitle)} — ${escapeMarkdown(Array.isArray(chatMerchant) ? chatMerchant.join(', ') : chatMerchant)}; Google: ${escapeMarkdown(googleTitle)} — ${escapeMarkdown(googleMerchant)}`,
-        );
-      }
+      lines.push('');
+      continue;
     }
+
+    const displayProduct = (product) => {
+      const title = product.title ?? product.name ?? product.product_title ?? '(untitled)';
+      const merchant =
+        product.merchant ?? product.merchants ?? product.seller ??
+        product.merchant_domain ?? product.domain ?? '(unknown merchant)';
+      const normalizedMerchant = Array.isArray(merchant) ? merchant.join(', ') : merchant;
+      const gtin = gtinFor(product);
+      return `${escapeMarkdown(title)} — ${escapeMarkdown(normalizedMerchant)}${gtin ? ` (GTIN ${escapeMarkdown(gtin)})` : ''}`;
+    };
+
+    lines.push('| ChatGPT Shopping product | Google Shopping product | Match |');
+    lines.push('|---|---|---|');
+    for (const pair of item.matches) {
+      lines.push(`| ${displayProduct(pair.chatgpt)} | ${displayProduct(pair.google)} | Matched |`);
+    }
+    for (const product of item.unmatchedChatgptProducts ?? []) {
+      lines.push(`| ${displayProduct(product)} | — | No Google match |`);
+    }
+    for (const product of item.unmatchedGoogleProducts ?? []) {
+      lines.push(`| — | ${displayProduct(product)} | No ChatGPT match |`);
+    }
+    if (
+      item.matches.length === 0 &&
+      (item.unmatchedChatgptProducts ?? []).length === 0 &&
+      (item.unmatchedGoogleProducts ?? []).length === 0
+    ) {
+      lines.push('| No products returned | No products returned | No products to compare |');
+    }
+    lines.push('');
   }
 
   lines.push(
@@ -260,10 +287,15 @@ async function main() {
     const query = typeof prompt?.query === 'string' ? prompt.query.trim() : '';
     if (!query) throw new Error(`Prompt ${index + 1} is missing a non-empty query.`);
     if (query.length > 700) throw new Error(`Prompt ${index + 1} exceeds DataForSEO's 700-character keyword limit.`);
+    if (!Array.isArray(prompt.chatgptProducts)) {
+      throw new Error(
+        `Prompt ${index + 1} must include chatgptProducts as an array. Use [] only when the actual ChatGPT Shopping capture returned no cards.`,
+      );
+    }
     return {
       index: index + 1,
       query,
-      chatgptProducts: Array.isArray(prompt.chatgptProducts) ? prompt.chatgptProducts : [],
+      chatgptProducts: prompt.chatgptProducts,
       tag: `ansvisor-overlap:${country}:${index + 1}`,
       keyword: query,
       locationCode,
