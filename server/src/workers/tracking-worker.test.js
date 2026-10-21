@@ -11,6 +11,8 @@ import {
   interactiveTailExhausted,
   runnablePlatforms,
   shoppingTracked,
+  googleShoppingRunCount,
+  buildGoogleShoppingTaskPlan,
   tailRemainder,
   UNAVAILABLE_PLATFORMS,
 } from './tracking-worker.js';
@@ -254,6 +256,77 @@ describe('runnablePlatforms', () => {
   // all, rather than falling back to "no filter means run everything".
   it('leaves nothing to run when every platform is unavailable', () => {
     expect(runnablePlatforms([...UNAVAILABLE_PLATFORMS], { shoppingEnabled: true })).toEqual([]);
+  });
+});
+
+describe('Google Shopping task planning', () => {
+  it('defaults to three runs and bounds invalid configuration values', () => {
+    expect(googleShoppingRunCount(undefined)).toBe(3);
+    expect(googleShoppingRunCount('')).toBe(3);
+    expect(googleShoppingRunCount('5')).toBe(5);
+    expect(googleShoppingRunCount('0')).toBe(3);
+    expect(googleShoppingRunCount('11')).toBe(3);
+    expect(googleShoppingRunCount('not-a-number')).toBe(3);
+  });
+
+  it('collapses US state codes to one country and creates N tasks per supported country', () => {
+    const prompt = {
+      id: 'prompt-1',
+      text: 'best mirrorless camera',
+      platforms: ['chatgpt-shopping'],
+      regions: ['DE', 'DE', 'US-CA', 'US-NY', 'XX'],
+    };
+    const tasks = buildGoogleShoppingTaskPlan([prompt], {
+      enabled: true,
+      hasCredentials: true,
+      runs: 2,
+    });
+
+    expect(tasks).toHaveLength(4);
+    expect(tasks.map((task) => [task.region, task.runIndex])).toEqual([
+      ['DE', 1],
+      ['DE', 2],
+      ['US', 1],
+      ['US', 2],
+    ]);
+    expect(tasks.filter((task) => task.region === 'DE').every((task) => task.locationCode === 2276))
+      .toBe(true);
+    expect(tasks.filter((task) => task.region === 'US').every((task) => task.locationCode === 2840))
+      .toBe(true);
+    expect(tasks.find((task) => task.region === 'DE').languageCode).toBe('de');
+    expect(tasks.find((task) => task.region === 'US').languageCode).toBe('en');
+  });
+
+  it('does not schedule when the plan, credentials, prompt platform, location or query is invalid', () => {
+    const prompts = [
+      { id: 'no-shopping', text: 'camera', platforms: ['chatgpt-web'], regions: ['DE'] },
+      { id: 'no-location', text: 'camera', platforms: ['chatgpt-shopping'], regions: [] },
+      { id: 'unknown-location', text: 'camera', platforms: ['chatgpt-shopping'], regions: ['XX'] },
+      { id: 'too-long', text: 'x'.repeat(701), platforms: ['chatgpt-shopping'], regions: ['DE'] },
+      { id: 'blank', text: ' ', platforms: ['chatgpt-shopping'], regions: ['DE'] },
+    ];
+
+    expect(buildGoogleShoppingTaskPlan(prompts, {
+      enabled: false,
+      hasCredentials: true,
+    })).toEqual([]);
+    expect(buildGoogleShoppingTaskPlan(prompts, {
+      enabled: true,
+      hasCredentials: false,
+    })).toEqual([]);
+    expect(buildGoogleShoppingTaskPlan(prompts, {
+      enabled: true,
+      hasCredentials: true,
+    })).toEqual([]);
+  });
+
+  it('uses a supported explicit brand language over the country default', () => {
+    const tasks = buildGoogleShoppingTaskPlan(
+      [{ id: 'prompt-2', text: 'camera', platforms: ['chatgpt-shopping'], regions: ['DE'] }],
+      { enabled: true, hasCredentials: true, brandLanguage: 'fr-FR', runs: 1 },
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].languageCode).toBe('fr');
   });
 });
 
