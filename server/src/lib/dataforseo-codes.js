@@ -89,7 +89,7 @@ const LANGUAGE_PASSTHROUGH = new Set([
  * @returns {number|undefined} DataForSEO numeric location code, or undefined if no mapping
  */
 export function regionToLocationCode(region) {
-  if (!region) return undefined;
+  if (typeof region !== 'string' || !region.trim()) return undefined;
   return REGION_TO_LOCATION_CODE[region.trim().toUpperCase()];
 }
 
@@ -98,7 +98,7 @@ export function regionToLocationCode(region) {
  * @returns {string|undefined} DataForSEO-compatible language code, or undefined
  */
 export function languageToCode(language) {
-  if (!language) return undefined;
+  if (typeof language !== 'string' || !language.trim()) return undefined;
   // Brand settings may carry a BCP-47 tag (for example, "de-DE").
   const lower = language.trim().toLowerCase().split(/[-_]/)[0];
   return LANGUAGE_PASSTHROUGH.has(lower) ? lower : undefined;
