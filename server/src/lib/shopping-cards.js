@@ -393,7 +393,9 @@ export function parseGoogleShoppingCard(card, position) {
       toStringOrNull(card.image_url ?? card.image),
     merchant_url: merchantUrl,
     merchant_domain: merchantDomain,
-    rating: toNumber(rating && typeof rating === 'object' ? rating.value : card.rating),
+    rating: toNumber(
+      rating && typeof rating === 'object' ? rating.value : (rating ?? card.rating),
+    ),
     review_count: toInteger(
       card.reviews_count ?? card.review_count ?? (rating && typeof rating === 'object' ? rating.votes_count : null),
     ),
