@@ -10,6 +10,7 @@ import {
   parseAiModeCard,
   parseCopilotCard,
   parseChatgptCard,
+  parseGoogleShoppingCard,
   normalizeShoppingCards,
   normalizeInlineProducts,
   matchCardBrand,
@@ -452,5 +453,72 @@ describe('shopping-cards – matchCardBrand', () => {
   it('should be case-insensitive for brand name matching', () => {
     const card = { product_title: 'ACME product', merchant_domain: null };
     expect(matchCardBrand(card, brand, competitors).matched_brand_role).toBe('own');
+  });
+});
+
+describe('parseGoogleShoppingCard', () => {
+  it('normalizes the DataForSEO Merchant API shape without treating Google links as merchant links', () => {
+    const raw = {
+      type: 'google_shopping_serp',
+      title: 'Mirrorless Camera',
+      seller: 'Camera Store',
+      domain: 'camera.example',
+      url: null,
+      shopping_url: 'https://google.com/search?q=camera',
+      price: 799.9,
+      currency: 'EUR',
+      product_rating: { value: '4.6', votes_count: 83 },
+      reviews_count: 90,
+      product_images: ['https://img.example/camera.jpg'],
+      gtin: '00012345678905',
+      product_id: 'google-dynamic-id',
+    };
+
+    const card = parseGoogleShoppingCard(raw, 2);
+    expect(card).toMatchObject({
+      position: 2,
+      product_title: 'Mirrorless Camera',
+      product_brand: 'Camera Store',
+      price_amount: 799.9,
+      price_currency: 'EUR',
+      image_url: 'https://img.example/camera.jpg',
+      merchant_url: null,
+      merchant_domain: 'camera.example',
+      rating: 4.6,
+      review_count: 90,
+      raw,
+    });
+  });
+
+  it('tolerates missing optional fields and malformed product values', () => {
+    const card = parseGoogleShoppingCard({ title: 'Basic Product', price: null }, 0);
+    expect(card.product_title).toBe('Basic Product');
+    expect(card.product_brand).toBeNull();
+    expect(card.price_amount).toBeNull();
+    expect(card.price_currency).toBeNull();
+    expect(card.image_url).toBeNull();
+    expect(card.merchant_url).toBeNull();
+    expect(card.merchant_domain).toBeNull();
+    expect(card.rating).toBeNull();
+    expect(card.review_count).toBeNull();
+  });
+
+  it('is registered for normalizeShoppingCards and preserves appearance metadata', () => {
+    const cards = normalizeShoppingCards('google-shopping', [{
+      title: 'Camera',
+      seller: 'Store',
+      domain: 'store.example',
+      price: 10,
+      currency: 'EUR',
+      ansvisor_google_shopping_appearance: {
+        appearance_count: 2,
+        successful_run_count: 3,
+        appearance_percentage: 66.67,
+      },
+    }]);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0].product_title).toBe('Camera');
+    expect(cards[0].raw.ansvisor_google_shopping_appearance.appearance_percentage).toBe(66.67);
   });
 });
