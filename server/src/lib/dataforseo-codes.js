@@ -9,6 +9,7 @@
 const REGION_TO_LOCATION_CODE = {
   US: 2840,
   GB: 2826,
+  LI: 2438,
   AT: 2040,
   BE: 2056,
   BG: 2100,
@@ -144,6 +145,7 @@ export function defaultLanguageForRegion(region) {
     KR: 'ko',
     LT: 'lt',
     LU: 'fr',
+    LI: 'de',
     LV: 'lv',
     MT: 'en',
     MX: 'es',
