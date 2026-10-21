@@ -27,6 +27,7 @@ describe('dataforseo-codes', () => {
       expect(regionToLocationCode(null)).toBeUndefined();
       expect(regionToLocationCode(undefined)).toBeUndefined();
       expect(regionToLocationCode('')).toBeUndefined();
+      expect(regionToLocationCode(42)).toBeUndefined();
     });
   });
 
@@ -54,6 +55,7 @@ describe('dataforseo-codes', () => {
       expect(languageToCode(null)).toBeUndefined();
       expect(languageToCode(undefined)).toBeUndefined();
       expect(languageToCode('')).toBeUndefined();
+      expect(languageToCode(42)).toBeUndefined();
     });
   });
 });
