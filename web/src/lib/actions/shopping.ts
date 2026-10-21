@@ -272,6 +272,10 @@ export interface ShoppingProductAppearance {
   raw: unknown;
   merchant_url: string | null;
   merchant_domain: string | null;
+  /** Percentage of successful repeated Google Shopping runs that included this product. */
+  appearance_percentage: number | null;
+  appearance_count: number | null;
+  appearance_sample_size: number | null;
 }
 
 export interface ShoppingProduct {
@@ -397,6 +401,17 @@ function aggregateProducts(
         : undefined;
 
     const mappedApps: ShoppingProductAppearance[] = sortedApps.map((a) => {
+      const rawCard =
+        a.raw && typeof a.raw === 'object' ? (a.raw as Record<string, unknown>) : null;
+      const rawAppearance = rawCard?.ansvisor_google_shopping_appearance;
+      const appearance =
+        rawAppearance && typeof rawAppearance === 'object'
+          ? (rawAppearance as Record<string, unknown>)
+          : null;
+      const appearanceNumber = (key: string): number | null => {
+        const value = appearance?.[key];
+        return typeof value === 'number' && Number.isFinite(value) ? value : null;
+      };
       let promptText = 'Unknown Prompt';
       let promptId = '';
       if (a.prompt_results?.prompt) {
@@ -413,6 +428,9 @@ function aggregateProducts(
         raw: a.raw,
         merchant_url: a.merchant_url,
         merchant_domain: a.merchant_domain,
+        appearance_percentage: appearanceNumber('appearance_percentage'),
+        appearance_count: appearanceNumber('appearance_count'),
+        appearance_sample_size: appearanceNumber('successful_run_count'),
       };
     });
 
