@@ -1367,6 +1367,14 @@ function ProductAppearancesDrawer({ t, product, onOpenChange }: ProductAppearanc
                       <span className="text-[10px] text-muted-foreground tabular-nums">
                         {dateStr}
                       </span>
+                      {app.appearance_percentage != null &&
+                        app.appearance_count != null &&
+                        app.appearance_sample_size != null && (
+                          <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+                            {app.appearance_percentage}% · {app.appearance_count}/
+                            {app.appearance_sample_size} runs
+                          </Badge>
+                        )}
                     </div>
 
                     {app.merchant_url && (
