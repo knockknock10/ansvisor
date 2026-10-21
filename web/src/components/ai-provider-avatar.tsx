@@ -9,7 +9,8 @@ export type AIProviderKey =
   | 'perplexity'
   | 'copilot'
   | 'xai'
-  | 'meta';
+  | 'meta'
+  | 'googleShopping';
 
 const AI_PROVIDER_META: Record<
   AIProviderKey,
@@ -69,6 +70,12 @@ const AI_PROVIDER_META: Record<
     icon: '',
     fallbackClassName: 'bg-sky-500 text-white',
   },
+  googleShopping: {
+    label: 'Google Shopping',
+    shortLabel: 'G',
+    icon: '',
+    fallbackClassName: 'bg-blue-600 text-white',
+  },
 };
 
 export function resolveAIProvider(model: string, platform?: string): AIProviderKey {
@@ -122,6 +129,7 @@ export function resolveAIProvider(model: string, platform?: string): AIProviderK
   if (key === 'Meta AI' || key === 'meta-ai' || key.startsWith('llama-')) {
     return 'meta';
   }
+  if (key === 'google-shopping') return 'googleShopping';
 
   return platform ? resolveAIProvider(platform) : 'openai';
 }
