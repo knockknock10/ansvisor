@@ -71,14 +71,19 @@ function gtinFor(product) {
 }
 
 function merchantFor(product) {
-  const candidate = product?.merchant ?? product?.merchants ?? product?.seller ??
-    product?.merchant_domain ?? product?.domain ?? product?.url ??
-    product?.offers?.[0]?.url;
+  const explicitDomain = product?.merchant_domain ?? product?.domain ??
+    product?.url ?? product?.offers?.[0]?.url;
+  const candidate = explicitDomain ?? product?.merchant ?? product?.merchants ?? product?.seller;
   const value = Array.isArray(candidate) ? candidate.find((entry) => typeof entry === 'string') : candidate;
   if (typeof value !== 'string' || !value.trim()) return '';
+  // Bare seller names such as "MediaMarkt" are names, not hostnames.
+  // Treat a value as a domain only if it has URL syntax or a dotted host.
+  if (!value.includes('://') && !value.includes('.') && !value.includes('/')) {
+    return normalizeText(value);
+  }
   try {
     const url = value.includes('://') ? value : `https://${value}`;
-    return new URL(url).hostname.toLowerCase().replace(/^www\\./, '');
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
   } catch {
     return normalizeText(value);
   }
@@ -138,7 +143,7 @@ function matchProducts(chatgptProducts, googleProducts) {
 }
 
 function escapeMarkdown(value) {
-  return String(value ?? '').replace(/\\|/g, '\\\\|').replace(/[\\r\\n]+/g, ' ');
+  return String(value ?? '').replace(/\|/g, '\\|').replace(/[\r\n]+/g, ' ');
 }
 
 function percent(numerator, denominator) {
@@ -164,9 +169,6 @@ function buildReport({ country, language, prompts, measurements, cost }) {
   const succeeded = measurements.filter((item) => !item.error);
   const chatgptCount = measurements.reduce((sum, item) => sum + item.chatgptProducts.length, 0);
   const matchedCount = measurements.reduce((sum, item) => sum + item.matches.length, 0);
-  const promptCoverage = succeeded.length
-    ? measurements.filter((item) => !item.error && item.matches.length > 0).length / succeeded.length
-    : 0;
   const totalGoogleProducts = measurements.reduce((sum, item) => sum + item.googleProducts.length, 0);
   const costText = cost == null ? 'not reported by API' : `$${cost.toFixed(4)} USD`;
 
