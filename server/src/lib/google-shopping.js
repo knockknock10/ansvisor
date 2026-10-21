@@ -277,7 +277,12 @@ export async function getGoogleShoppingTask(taskId, { fetchImpl = fetch } = {}) 
  */
 export async function waitForGoogleShoppingTask(
   taskId,
-  { fetchImpl = fetch, attempts = 12, delayMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {},
+  {
+    fetchImpl = fetch,
+    attempts = 30,
+    delayMs = 2000,
+    sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  } = {},
 ) {
   if (!Number.isInteger(attempts) || attempts < 1) {
     throw new RangeError('Google Shopping task polling attempts must be at least 1');
