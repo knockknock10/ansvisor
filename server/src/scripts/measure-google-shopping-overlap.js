@@ -320,6 +320,13 @@ async function main() {
   } else {
     console.log(report);
   }
+
+  const successfulLookups = measurements.filter((measurement) => !measurement.error).length;
+  if (successfulLookups < 20) {
+    throw new Error(
+      `Only ${successfulLookups} Google Shopping lookups succeeded. At least 20 successful European queries are required; do not post this incomplete report as the issue's measurement.`,
+    );
+  }
 }
 
 main().catch((error) => {
