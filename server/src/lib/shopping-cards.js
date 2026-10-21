@@ -13,6 +13,9 @@
  *     keys inside `{ products: [ … ], tags }` wrappers; rich product
  *     objects with formatted price strings ("₺2.699,99") and an `offers`
  *     array (#399).
+ *   - **Google Shopping** (`platform = 'google-shopping'`) — DataForSEO
+ *     Merchant API products with nested rating/image fields and separate
+ *     seller domain / Google Shopping URL values.
  *
  * The downstream `prompt_result_shopping_cards` table flattens those onto
  * a single set of analytical columns. Each normalizer here pulls the
@@ -360,6 +363,45 @@ export function parseChatgptCard(card, position) {
 }
 
 /**
+ * DataForSEO Google Shopping product normalizer.
+ *
+ * The Merchant API's seller `url` is deprecated and often null; `domain`
+ * still identifies the merchant. Never substitute `shopping_url` for the
+ * merchant URL, because that URL points back to Google rather than the shop.
+ *
+ * @param {object} card
+ * @param {number} position
+ */
+export function parseGoogleShoppingCard(card, position) {
+  const price = parsePrice({
+    amount: card.price,
+    currency: card.currency,
+  });
+  const merchantUrl = toStringOrNull(card.url ?? card.merchant_url);
+  const merchantDomain = extractDomain(merchantUrl ?? card.domain);
+  const rating = card.product_rating;
+  const image = Array.isArray(card.product_images) ? card.product_images[0] : null;
+
+  return {
+    position,
+    product_title: toStringOrNull(card.title ?? card.name),
+    product_brand: toStringOrNull(card.brand ?? card.product_brand ?? card.seller ?? card.merchant),
+    price_amount: price.amount,
+    price_currency: price.currency,
+    image_url:
+      toStringOrNull(typeof image === 'string' ? image : image?.url) ??
+      toStringOrNull(card.image_url ?? card.image),
+    merchant_url: merchantUrl,
+    merchant_domain: merchantDomain,
+    rating: toNumber(rating && typeof rating === 'object' ? rating.value : card.rating),
+    review_count: toInteger(
+      card.reviews_count ?? card.review_count ?? (rating && typeof rating === 'object' ? rating.votes_count : null),
+    ),
+    raw: card,
+  };
+}
+
+/**
  * Pick the right normalizer for a platform / scraper id.
  *
  * NB: `chatgpt-shopping` matches exactly — plain `chatgpt-web` answers never
@@ -374,6 +416,7 @@ function pickParser(platform) {
   if (p.startsWith('perplexity')) return parsePerplexityCard;
   if (p.startsWith('google-aimode') || p === 'google-ai-mode') return parseAiModeCard;
   if (p.startsWith('copilot')) return parseCopilotCard;
+  if (p === 'google-shopping') return parseGoogleShoppingCard;
   if (p === 'chatgpt-shopping') return parseChatgptCard;
   return null;
 }
