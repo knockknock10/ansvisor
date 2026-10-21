@@ -29,6 +29,7 @@ export const PLATFORM_LABELS: Record<string, string> = {
   'grok-web': 'Grok',
   'perplexity-web': 'Perplexity',
   'gemini-web': 'Google Gemini',
+  'google-shopping': 'Google Shopping',
 
   // Model slugs reused as a fallback label in a few chart/progress spots.
   'gpt-5-chat-latest': 'GPT-5',
