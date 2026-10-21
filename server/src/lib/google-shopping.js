@@ -127,7 +127,8 @@ export async function submitGoogleShoppingTasks(tasks, { fetchImpl = fetch, onRe
   const requests = [];
   const credentials = authHeader();
 
-  for (const batch of chunks(normalized, MAX_TASKS_PER_REQUEST)) {
+  const batches = chunks(normalized, MAX_TASKS_PER_REQUEST);
+  for (const [batchIndex, batch] of batches.entries()) {
     let request;
     try {
       const response = await fetchImpl(TASK_POST_URL, {
@@ -198,18 +199,15 @@ export async function submitGoogleShoppingTasks(tasks, { fetchImpl = fetch, onRe
       }
       // Invalid credentials are not fixed by sending the next batch.
       if (error?.status === 401 || error?.status === 403) {
-        const submittedSet = new Set(normalized.slice(0, submittedTasks.length).map((task) => task.tag));
-        for (const remaining of normalized.slice(submittedTasks.length)) {
-          if (!submittedSet.has(remaining.tag)) {
-            submittedTasks.push({
-              ...remaining,
-              id: null,
-              statusCode: error.status,
-              statusMessage: null,
-              taskCost: null,
-              error: request.error,
-            });
-          }
+        for (const remaining of batches.slice(batchIndex + 1).flat()) {
+          submittedTasks.push({
+            ...remaining,
+            id: null,
+            statusCode: error.status,
+            statusMessage: null,
+            taskCost: null,
+            error: request.error,
+          });
         }
         requests.push(request);
         try {
