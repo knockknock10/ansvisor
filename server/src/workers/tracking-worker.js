@@ -1070,7 +1070,13 @@ export async function processTrackingJob({ brandId, promptId, promptIds, source,
             const inserted = await insertResult({
               prompt_id: result.promptId,
               brand_id: brandId,
-              platform: 'google-shopping',
+              // The parent result uses the existing shopping-only sentinel so
+              // ordinary Insights/visibility aggregates exclude these rows.
+              // The product source itself is stored separately below as
+              // platform='google-shopping' in prompt_result_shopping_cards.
+              // Keep raw parent cards empty so a backfill cannot misparse them
+              // as ChatGPT Shopping products.
+              platform: 'chatgpt-shopping',
               response: `Google Shopping products for "${result.keyword}" in ${result.region}.`,
               citations: [],
               mention_count: 0,
@@ -1082,7 +1088,7 @@ export async function processTrackingJob({ brandId, promptId, promptIds, source,
               competitor_mentions: [],
               mention_position: null,
               mentioned_entity_count: 0,
-              shopping_cards: productCards,
+              shopping_cards: [],
               inline_products: [],
               search_queries: [],
             });
