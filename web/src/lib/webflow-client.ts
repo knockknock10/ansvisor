@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
  */
 
 /** The parts of a page a field map places. */
-export const WEBFLOW_PARTS = ['body', 'metaTitle', 'metaDescription', 'jsonLd'] as const;
+export const WEBFLOW_PARTS = ['body', 'metaTitle', 'metaDescription', 'reviewedBy', 'jsonLd'] as const;
 export type WebflowPart = (typeof WEBFLOW_PARTS)[number];
 export type WebflowFieldMap = Partial<Record<WebflowPart, string>>;
 /** The Webflow field types each part may go to. */
@@ -18,6 +18,7 @@ export const WEBFLOW_PART_TYPES: Record<WebflowPart, string> = {
   body: 'RichText',
   metaTitle: 'PlainText',
   metaDescription: 'PlainText',
+  reviewedBy: 'PlainText',
   jsonLd: 'PlainText',
 };
 

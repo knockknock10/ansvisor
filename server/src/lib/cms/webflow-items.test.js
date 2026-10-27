@@ -122,6 +122,31 @@ describe('fieldDataFor', () => {
     expect(JSON.parse(data.schema)).toEqual({ '@type': 'Article', headline: '</script>' });
   });
 
+  it('writes the selected reviewer to its optional text field, clearing it when absent', () => {
+    expect(
+      fieldDataFor(
+        {
+          page: { ...page, reviewedBy: 'Dr. Grace Hopper' },
+          slug: 's',
+          body: '<p>x</p>',
+          jsonLd: [],
+        },
+        { body: 'post-body', reviewedBy: 'reviewed-by' },
+      ),
+    ).toMatchObject({
+      name: 'Cold brew at home',
+      slug: 's',
+      'post-body': '<p>x</p>',
+      'reviewed-by': 'Dr. Grace Hopper',
+    });
+    expect(
+      fieldDataFor(
+        { page, slug: 's', body: '<p>x</p>', jsonLd: [] },
+        { body: 'post-body', reviewedBy: 'reviewed-by' },
+      )['reviewed-by'],
+    ).toBe('');
+  });
+
   it('sends the page’s own meta, several JSON-LD blocks as a list, and nothing for a part the map leaves out', () => {
     const data = fieldDataFor(
       {

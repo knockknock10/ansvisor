@@ -112,6 +112,7 @@ import { HANDOFF_KEYS, handOffItems } from '@/lib/content/hand-off';
 import {
   blankCode,
   bylineText,
+  reviewerLineText,
   disclosureText,
   exportPlaceholders,
   pasteChecks,
@@ -1478,6 +1479,8 @@ export function DraftEditor({
         eeat: eeatScore,
         trust: trustScore,
         author: pageAuthor,
+        reviewer: pageReviewer,
+        regulated,
         canEdit: canEditPageAuthor,
         hasAuthors,
         brandName,
@@ -2855,10 +2858,17 @@ export function DraftEditor({
   // Readability reads it: the language the writer writes the page in.
   // An author the person confirmed their site names (00271) isn't the team:
   // no "By {Brand} Team" line goes in for them.
-  const contentByline =
+  const authorByline =
     bylineInContent && authorsRead && (pageAuthor || !authorConfirmed.real)
       ? bylineText(language, pageAuthor?.name ?? null, brandName)
       : null;
+  // A regulated page names its selected reviewer in the visible page byline,
+  // regardless of whether the brand also wants an author/team byline.
+  const reviewerByline =
+    regulated && authorsRead && pageReviewer ? reviewerLineText(language, pageReviewer.name) : null;
+  const contentByline =
+    [authorByline, reviewerByline].filter((line): line is string => Boolean(line)).join(' · ') ||
+    null;
   // The team for the CMS's author field (Export, Send to CMS), in the page's
   // language; until the authors are read, who it is by isn't known. Not for
   // an author the person confirmed their site names: the CMS keeps its own.
@@ -4207,6 +4217,7 @@ export function DraftEditor({
           isNew={draft.method === 'create'}
           sourceUrl={draft.sourceUrl}
           author={pageAuthor}
+          reviewer={regulated ? pageReviewer : null}
           teamByline={teamByline}
           siteAuthor={!pageAuthor && authorConfirmed.real}
           byline={contentByline}
@@ -4254,6 +4265,7 @@ export function DraftEditor({
           html={sendOpen.html}
           sourceUrl={draft.sourceUrl}
           author={pageAuthor}
+          reviewer={regulated ? pageReviewer : null}
           teamByline={teamByline}
           byline={contentByline}
           onFillNow={() => {
@@ -4294,6 +4306,7 @@ export function DraftEditor({
           onClose={() => setPublishOpen(null)}
           quality={quality}
           title={title}
+          reviewerLine={reviewerByline}
           isNew={draft.method === 'create'}
           pageType={pageType}
           image={firstImage(pageHtml)}

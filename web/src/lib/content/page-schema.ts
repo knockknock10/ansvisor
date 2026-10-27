@@ -118,6 +118,37 @@ export function articleJsonLd({
 }
 
 /**
+ * The page-level structured data for a regulated page. The reviewer is an
+ * explicit person selected from Authors; we never infer a reviewer from the
+ * article author or from prose.
+ */
+export function webPageJsonLd({
+  title,
+  reviewer,
+  reviewerUrl,
+}: {
+  title: string;
+  reviewer: ContentAuthor;
+  reviewerUrl: string | null;
+}): Record<string, unknown> {
+  const name = pageName(title);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    ...(name ? { name } : {}),
+    reviewedBy: {
+      '@type': 'Person',
+      name: reviewer.name,
+      ...(reviewer.title ? { jobTitle: reviewer.title } : {}),
+      ...(reviewerUrl ? { url: reviewerUrl } : {}),
+      ...(reviewer.photoUrl ? { image: reviewer.photoUrl } : {}),
+      ...(reviewer.sameAs.length ? { sameAs: reviewer.sameAs } : {}),
+    },
+  };
+}
+
+
+/**
  * A product page's price as the page states it (Quality spec §11, CE-053):
  * one price is the product's Offer, a range it writes ("$119–$139") its low
  * and high. Each amount is read by the words around it, so a sentence keeps

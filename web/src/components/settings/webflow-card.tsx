@@ -337,6 +337,9 @@ function WebflowMapping({
   onStale: () => void;
 }) {
   const t = useTranslations('settings.webflow');
+  const tEditor = useTranslations('contentEditor.editor');
+  const partLabel = (part: (typeof WEBFLOW_PARTS)[number]) =>
+    part === 'reviewedBy' ? tEditor('reviewer.title') : t(`parts.${part}`);
   // The saved settings, for the fields read: a save doesn't read them again.
   const saved = useRef(connection);
   useEffect(() => {
@@ -457,7 +460,7 @@ function WebflowMapping({
   /** The API names a part by its key ("metaTitle: …"): the person reads its label. */
   const problemText = (problem: string) => {
     const part = WEBFLOW_PARTS.find((p) => problem.startsWith(`${p}: `));
-    return part ? `${t(`parts.${part}`)}: ${problem.slice(part.length + 2)}` : problem;
+    return part ? `${partLabel(part)}: ${problem.slice(part.length + 2)}` : problem;
   };
   const siteItems = sites.map((s) => ({ value: s.id, label: s.name }));
   const collectionItems = (collections ?? []).map((c) => ({ value: c.id, label: c.name }));
@@ -537,7 +540,7 @@ function WebflowMapping({
               return (
                 <Picker
                   key={part}
-                  label={t(`parts.${part}`)}
+                  label={partLabel(part)}
                   items={items}
                   value={
                     picked && items.some((item) => item.value === picked)

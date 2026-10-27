@@ -106,6 +106,7 @@ describe('cmsPage', () => {
         html,
         fields: { slug: ' coffee ', metaTitle: ' Coffee ', metaDescription: ' Slowly. ' },
         page: { ...page, featuredImage: 'https://cdn.example/cup.jpg' },
+        reviewedBy: 'Dr. Grace Hopper',
         byline: null,
       }),
     ).toEqual({
@@ -116,6 +117,7 @@ describe('cmsPage', () => {
       metaDescription: 'Slowly.',
       html: '<p>Brew it slowly.</p>\n<img src="https://cdn.example/cup.jpg" alt="A cup">',
       author: 'Ada Lovelace',
+      reviewedBy: 'Dr. Grace Hopper',
       featuredImage: { src: 'https://cdn.example/cup.jpg', alt: 'A cup' },
     });
   });
@@ -178,6 +180,7 @@ describe('cmsSource', () => {
     bodyHtml: '<h1>Pour-over</h1><p>Brew it slowly.</p>',
     sourceUrl: 'https://acme.example/pour-over',
     authorId: 'a1',
+    reviewerId: null,
     authorConfirmed: false,
     language: null,
   };
@@ -204,12 +207,21 @@ describe('cmsSource', () => {
       html: expect.stringContaining('<p>Brew it slowly.</p>'),
       sourceUrl: 'https://acme.example/pour-over',
       author: ada,
+      reviewer: null,
+      reviewedBy: null,
       teamByline: 'Acme Team',
       byline: null,
     });
   });
 
-  it('adds the byline line in the page’s language, else the brand’s', () => {
+  it('resolves a selected reviewer from Authors, and omits an unavailable reviewer', () => {
+    expect(source({ page: { ...stored, reviewerId: 'a1' } }).reviewedBy).toBe('Ada Lovelace');
+    expect(source({ page: { ...stored, reviewerId: 'a1' } }).reviewer).toEqual(ada);
+    expect(source({ page: { ...stored, reviewerId: 'a1' } }).byline).toBe('Reviewed by Ada Lovelace');
+    expect(source({ page: { ...stored, reviewerId: 'a1' }, authors: null }).reviewedBy).toBeNull();
+  });
+
+  it('adds the byline line in the page’s language, else the brand’s', () =>
     expect(source({ authors: authors(true) }).byline).toBe('By Ada Lovelace');
     expect(source({ authors: authors(true), brandLanguage: 'tr' }).byline).toBe(
       'Yazar: Ada Lovelace',
@@ -256,6 +268,7 @@ describe('bulkCmsItems', () => {
     html: '<h1>Pour-over</h1>\n<p>Brew it slowly.</p>',
     sourceUrl: null,
     author: null,
+    reviewedBy: null,
     teamByline: 'Acme Team',
     byline: null,
     ...over,
@@ -286,7 +299,14 @@ describe('bulkCmsItems', () => {
       metaDescription: 'Brew it slowly.',
       html: '<p>Brew it slowly.</p>',
       author: 'Acme Team',
+      reviewedBy: null,
     });
+    const reviewed = bulkCmsItems(
+      [source({ reviewedBy: 'Dr. Grace Hopper', byline: 'Reviewed by Dr. Grace Hopper' })],
+      new Map(),
+    )[0];
+    expect(reviewed.page).toMatchObject({ reviewedBy: 'Dr. Grace Hopper' });
+    expect(reviewed.page?.html).toContain('<p>Reviewed by Dr. Grace Hopper</p>');
     expect(items.slice(1).every((item) => item.page === null)).toBe(true);
   });
 
@@ -309,6 +329,7 @@ describe('cmsSendGroups', () => {
     metaDescription: '',
     html: 'x'.repeat(chars),
     author: null,
+    reviewedBy: null,
     featuredImage: null,
   });
 

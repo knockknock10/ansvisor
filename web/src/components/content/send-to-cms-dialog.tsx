@@ -52,6 +52,7 @@ export function SendDialog({
   html,
   sourceUrl,
   author,
+  reviewer,
   teamByline,
   byline,
   onFillNow,
@@ -64,6 +65,7 @@ export function SendDialog({
   html: string;
   sourceUrl: string | null;
   author: ContentAuthor | null;
+  reviewer: ContentAuthor | null;
   /** The brand's team in the page's language (teamName); empty while the authors aren't read. */
   teamByline: string;
   /** The byline line the brand puts in the content, or null. */
@@ -73,6 +75,7 @@ export function SendDialog({
   onClose: () => void;
 }) {
   const t = useTranslations('contentEditor.editor.send');
+  const tEditor = useTranslations('contentEditor.editor');
   const tFailure = useTranslations('apiFailure');
   const format = useFormatter();
   const page = useMemo(
@@ -157,7 +160,7 @@ export function SendDialog({
     setProblem(null);
     const result = await sendPagesToCms(
       brandId,
-      [cmsPage({ draftId, title, html, fields, page, byline })],
+      [cmsPage({ draftId, title, html, fields, page, reviewedBy: reviewer?.name ?? null, byline })],
       target,
     );
     setSending(false);
@@ -266,6 +269,22 @@ export function SendDialog({
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground">{t('fields.title')}</p>
             <p className="text-sm [overflow-wrap:anywhere]">{title.trim() || '—'}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">{tEditor('author.title')}</p>
+              <p className="text-sm [overflow-wrap:anywhere]">{page.author || '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">{tEditor('reviewer.title')}</p>
+              <p className="text-sm [overflow-wrap:anywhere]">
+                {reviewer
+                  ? reviewer.title
+                    ? tEditor('reviewer.byTitle', { name: reviewer.name, title: reviewer.title })
+                    : tEditor('reviewer.by', { name: reviewer.name })
+                  : tEditor('reviewer.none')}
+              </p>
+            </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="cms-slug">{t('fields.slug')}</Label>

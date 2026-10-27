@@ -101,6 +101,7 @@ async function render(
     paste = clean,
     mode = 'markReady' as 'markReady' | 'export' | 'send',
     contentByline = null as string | null,
+    reviewerLine = null as string | null,
     title = 'How small teams forecast',
     disclosureLine = null as string | null,
     disclosureAdded = false,
@@ -116,6 +117,7 @@ async function render(
           paste={paste}
           onFillNow={onFillNow}
           contentByline={contentByline}
+          reviewerLine={reviewerLine}
           onContinue={onContinue}
           onClose={() => {}}
           quality={q}
@@ -141,13 +143,11 @@ const alert = () => dialog().querySelector('[role="alert"]');
 const button = (name: string) =>
   [...dialog().querySelectorAll('button')].find((b) => b.textContent === name);
 const rows = () => [...dialog().querySelectorAll('li > div')].map((row) => row.textContent);
-const jsonLd = () =>
-  JSON.parse(
-    dialog()
-      .querySelector('pre')!
-      .textContent!.replace(/^<script[^>]*>/, '')
-      .replace(/<\/script>$/, ''),
-  );
+const jsonLdBlocks = () =>
+  [...(dialog().querySelector('pre')?.textContent ?? '').matchAll(
+    /<script[^>]*>\s*([\s\S]*?)\s*<\/script>/g,
+  )].map((match) => JSON.parse(match[1]));
+const jsonLd = () => jsonLdBlocks()[0];
 /** A Trust read as the checks would give it. */
 const trustRead = (over: Partial<TrustRead>): TrustRead => ({
   score: 50,
@@ -446,6 +446,43 @@ describe('BeforePublish', () => {
     expect(
       [...dialog().querySelectorAll('button')].some((b) => b.textContent === 'Copy JSON-LD'),
     ).toBe(false);
+  });
+
+  it('names the selected reviewer and includes WebPage.reviewedBy as a Person', async () => {
+    await render(quality({ reviewer: ada, regulated: 'health' }), {
+      contentByline: 'By Ada · Reviewed by Ada Lovelace',
+      reviewerLine: 'Reviewed by Ada Lovelace',
+    });
+    expect(rows().some((row) => row?.startsWith('Reviewed by Ada Lovelace, Head of Content'))).toBe(
+      true,
+    );
+
+    const pageSchema = jsonLdBlocks().find((schema) => schema['@type'] === 'WebPage');
+    expect(pageSchema).toMatchObject({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'How small teams forecast',
+      reviewedBy: {
+        '@type': 'Person',
+        name: 'Ada Lovelace',
+        jobTitle: 'Head of Content',
+        url: 'https://acme.com/ada',
+      },
+    });
+  });
+
+  it('does not pass reviewer attribution when the reviewer is not in the visible page line', async () => {
+    await render(quality({ reviewer: ada, regulated: 'health' }));
+    expect(rows().some((row) => row?.startsWith('Reviewer not named on the page · missing'))).toBe(
+      true,
+    );
+    expect(jsonLdBlocks().some((schema) => schema['@type'] === 'WebPage')).toBe(false);
+  });
+
+  it('marks a regulated page missing when no reviewer is selected', async () => {
+    await render(quality({ reviewer: null, regulated: 'finance' }));
+    expect(rows().some((row) => row?.startsWith('No reviewer · missing'))).toBe(true);
+    expect(jsonLdBlocks().some((schema) => schema['@type'] === 'WebPage')).toBe(false);
   });
 
   it('names the brand’s byline as checked on a page type that wants no author (CE-052)', async () => {

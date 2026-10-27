@@ -101,6 +101,7 @@ const page = (over = {}) => ({
   metaDescription: 'The tools that help AI answers cite you.',
   html: '<h2>Why</h2><p>Because.</p>',
   author: 'Ada Lovelace',
+  reviewedBy: 'Grace Hopper',
   featuredImage: null,
   ...over,
 });
@@ -225,6 +226,7 @@ describe('sendContentPages', () => {
         html: '<h2>Why</h2><p>Because.</p>',
         jsonLd: [],
         author: 'Ada Lovelace',
+        reviewedBy: 'Grace Hopper',
         method: 'create',
         sourceUrl: null,
         pageType: 'blog_post',

@@ -441,16 +441,16 @@ export function pageFields({
  * written in the page's language, not the app's. A language not here gets
  * the name alone, or the brand's.
  */
-const BYLINES: Record<string, { by: string; team: string; teamName: string }> = {
-  en: { by: 'By {name}', team: 'By {brand} Team', teamName: '{brand} Team' },
-  tr: { by: 'Yazar: {name}', team: 'Yazar: {brand} Ekibi', teamName: '{brand} Ekibi' },
-  de: { by: 'Von {name}', team: 'Vom {brand}-Team', teamName: '{brand}-Team' },
-  fr: { by: 'Par {name}', team: "Par l'équipe {brand}", teamName: 'Équipe {brand}' },
-  es: { by: 'Por {name}', team: 'Por el equipo de {brand}', teamName: 'Equipo de {brand}' },
-  pt: { by: 'Por {name}', team: 'Pela equipe {brand}', teamName: 'Equipe {brand}' },
-  it: { by: 'Di {name}', team: 'A cura del team {brand}', teamName: 'Team {brand}' },
-  nl: { by: 'Door {name}', team: 'Door het {brand}-team', teamName: '{brand}-team' },
-  sv: { by: 'Av {name}', team: 'Av {brand}-teamet', teamName: '{brand}-teamet' },
+const BYLINES: Record<string, { by: string; team: string; teamName: string; reviewer: string }> = {
+  en: { by: 'By {name}', team: 'By {brand} Team', teamName: '{brand} Team', reviewer: 'Reviewed by {name}' },
+  tr: { by: 'Yazar: {name}', team: 'Yazar: {brand} Ekibi', teamName: '{brand} Ekibi', reviewer: '{name} tarafından incelendi' },
+  de: { by: 'Von {name}', team: 'Vom {brand}-Team', teamName: '{brand}-Team', reviewer: 'Geprüft von {name}' },
+  fr: { by: 'Par {name}', team: "Par l'équipe {brand}", teamName: 'Équipe {brand}', reviewer: 'Révisé par {name}' },
+  es: { by: 'Por {name}', team: 'Por el equipo de {brand}', teamName: 'Equipo de {brand}', reviewer: 'Revisado por {name}' },
+  pt: { by: 'Por {name}', team: 'Pela equipe {brand}', teamName: 'Equipe {brand}', reviewer: 'Revisado por {name}' },
+  it: { by: 'Di {name}', team: 'A cura del team {brand}', teamName: 'Team {brand}', reviewer: 'Revisionato da {name}' },
+  nl: { by: 'Door {name}', team: 'Door het {brand}-team', teamName: '{brand}-team', reviewer: 'Beoordeeld door {name}' },
+  sv: { by: 'Av {name}', team: 'Av {brand}-teamet', teamName: '{brand}-teamet', reviewer: 'Granskad av {name}' },
 };
 
 /**
@@ -466,6 +466,15 @@ export function bylineText(
   // A function, so a "$" in a name is written as it is.
   if (author) return forms ? forms.by.replace('{name}', () => author) : author;
   return forms ? forms.team.replace('{brand}', () => brand) : brand;
+}
+
+/**
+ * The visible reviewer attribution for a regulated page, in the page's
+ * language rather than the app's interface language.
+ */
+export function reviewerLineText(language: string | null | undefined, reviewer: string): string {
+  const forms = BYLINES[languageCode(language) ?? ''];
+  return forms ? forms.reviewer.replace('{name}', () => reviewer) : `Reviewed by ${reviewer}`;
 }
 
 /**

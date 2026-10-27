@@ -63,6 +63,10 @@ export interface QualityRead {
   trust: TrustRead | null;
   /** The page's author, or null for the organization byline. */
   author: ContentAuthor | null;
+  /** The selected qualified reviewer for regulated-page metadata. */
+  reviewer?: ContentAuthor | null;
+  /** The page read classified it as advising on one of these regulated topics. */
+  regulated?: 'health' | 'finance' | 'legal' | null;
   /** Whether the member reading may edit that author in Settings › Authors. */
   canEdit: boolean;
   /** Whether the workspace has an author to pick (Settings › Authors). */

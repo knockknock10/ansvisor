@@ -17,6 +17,7 @@ import {
   itemListJsonLd,
   MIN_LISTED,
   productJsonLd,
+  webPageJsonLd,
   type ListedProduct,
   type PageOfferRead,
   jsonLdScript,
@@ -85,6 +86,7 @@ export function BeforePublish({
   paste,
   onFillNow,
   contentByline = null,
+  reviewerLine = null,
   onContinue,
   onClose,
   quality,
@@ -119,6 +121,8 @@ export function BeforePublish({
   onFillNow: () => void;
   /** The byline line the brand puts in the content (Add byline to content), or null. */
   contentByline?: string | null;
+  /** The visible reviewer attribution the page must include when regulated. */
+  reviewerLine?: string | null;
   /** Export's and Send's: goes on to them. */
   onContinue?: () => void;
   onClose: () => void;
@@ -146,13 +150,19 @@ export function BeforePublish({
   onAddDisclosure?: (line: string) => void;
 }) {
   const t = useTranslations('contentEditor.editor.beforePublish');
+  const tEditor = useTranslations('contentEditor.editor');
   const tQuality = useTranslations('contentEditor.editor.quality');
   const markRef = useRef<HTMLButtonElement>(null);
   // Fix first and Fill now move on to the page: focus isn't sent back to the button.
   const fixing = useRef(false);
-  const { author, brandName, siteTrust } = quality;
+  const { author, reviewer, regulated, brandName, siteTrust } = quality;
   // E-E-A-T is read with the authors: until then, who the page is by isn't known.
   const authorsRead = quality.eeat !== null;
+  const reviewerVisible = Boolean(
+    reviewer &&
+      reviewerLine &&
+      (contentByline === reviewerLine || contentByline?.endsWith(` · ${reviewerLine}`)),
+  );
   const trust = quality.trust?.score ?? null;
   const below = trust !== null && trust < TRUST_GATE;
   // The biggest of what would raise Trust: the warning's reason. The claims
@@ -188,7 +198,7 @@ export function BeforePublish({
     category?.status === 'read' &&
     category.items.length >= MIN_LISTED &&
     jsonLdScript(itemListJsonLd({ name: productName, items: category.items }));
-  const jsonLd = productLd
+  const pageJsonLd = productLd
     ? productLd
     : itemListLd
       ? itemListLd
@@ -211,6 +221,21 @@ export function BeforePublish({
             }),
           )
         : null;
+  // WebPage inherits CreativeWork.reviewedBy; its Person comes only from the brand's Authors.
+  const reviewerJsonLd =
+    regulated && reviewer && reviewerVisible
+      ? jsonLdScript(
+          webPageJsonLd({
+            title,
+            reviewer,
+            reviewerUrl:
+              siteTrust?.checks.authorPages.authors.find((a) => a.name === reviewer.name)?.url ??
+              null,
+          }),
+        )
+      : null;
+  // A page can need both its Article/Product/ItemList schema and its WebPage reviewer.
+  const jsonLd = [pageJsonLd, reviewerJsonLd].filter(Boolean).join('\n') || null;
   // Added here: it counts once the page is read again.
   const [added, setAdded] = useState(false);
   // Where the page's type counts it (CE-052): a product page is the brand's own.
@@ -245,6 +270,23 @@ export function BeforePublish({
                 title: t('author.none'),
                 detail: t('author.noneDetail', { byline: quality.team }),
               },
+    ...(regulated
+      ? [
+          {
+            state: !authorsRead ? ('check' as const) : reviewerVisible ? ('check' as const) : ('missing' as const),
+            title: !authorsRead
+              ? tEditor('reviewer.title')
+              : !reviewer
+                ? tEditor('reviewer.none')
+                : reviewerVisible
+                  ? reviewer.title
+                    ? tEditor('reviewer.byTitle', { name: reviewer.name, title: reviewer.title })
+                    : tEditor('reviewer.by', { name: reviewer.name })
+                  : tEditor('reviewer.notOnPage'),
+            detail: reviewer && !reviewerVisible ? tEditor('reviewer.notOnPageHint') : tEditor('reviewer.hint'),
+          },
+        ]
+      : []),
     ...(product
       ? productLd
         ? [

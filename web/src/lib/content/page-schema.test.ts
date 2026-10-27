@@ -13,6 +13,7 @@ import {
   openingParagraph,
   pageOffer,
   productJsonLd,
+  webPageJsonLd,
 } from './page-schema';
 
 /** Before you publish's JSON-LD (Quality spec §7, CE-041): from the page's facts, nothing made up. */
@@ -107,6 +108,46 @@ describe('articleJsonLd', () => {
     const result = articleJsonLd({ ...base, isNew: false });
     expect(result).not.toHaveProperty('datePublished');
     expect(result.dateModified).toBe('2026-10-23');
+  });
+});
+
+describe('webPageJsonLd', () => {
+  it('puts a qualified reviewer from Authors on the WebPage node as a Person', () => {
+    expect(
+      webPageJsonLd({
+        title: base.title,
+        reviewer: ada,
+        reviewerUrl: 'https://acme.com/authors/ada-lovelace',
+      }),
+    ).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: base.title,
+      reviewedBy: {
+        '@type': 'Person',
+        name: 'Ada Lovelace',
+        jobTitle: 'Head of Content',
+        url: 'https://acme.com/authors/ada-lovelace',
+        image: 'https://cdn.acme.com/ada.jpg',
+        sameAs: ['https://www.linkedin.com/in/ada'],
+      },
+    });
+  });
+
+  it('leaves the reviewer page name out while the title is a placeholder', () => {
+    expect(
+      webPageJsonLd({ title: 'Guide to [industry]', reviewer: ada, reviewerUrl: null }),
+    ).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      reviewedBy: {
+        '@type': 'Person',
+        name: 'Ada Lovelace',
+        jobTitle: 'Head of Content',
+        image: 'https://cdn.acme.com/ada.jpg',
+        sameAs: ['https://www.linkedin.com/in/ada'],
+      },
+    });
   });
 });
 

@@ -164,6 +164,7 @@ export function ExportDialog({
   isNew,
   sourceUrl,
   author,
+  reviewer,
   teamByline,
   siteAuthor = false,
   byline,
@@ -182,6 +183,8 @@ export function ExportDialog({
   /** The live page an optimized draft is for: its address is the slug. */
   sourceUrl: string | null;
   author: ContentAuthor | null;
+  /** The qualified reviewer to carry as page metadata. */
+  reviewer: ContentAuthor | null;
   /** The team byline; empty while the authors aren't read, or for the site's own author. */
   teamByline: string;
   /** No author picked, the one the site names confirmed (00271): the CMS keeps its own. */
@@ -214,6 +217,7 @@ export function ExportDialog({
   } | null;
 }) {
   const t = useTranslations('contentEditor.editor.exportDialog');
+  const tEditor = useTranslations('contentEditor.editor');
   const [destination, setDestination] = useState<ExportDestination>(
     () => initialDestination ?? storedDestination(),
   );
@@ -303,6 +307,7 @@ export function ExportDialog({
         [t('fields.metaDescription'), fields.metaDescription],
         ...(fields.slug ? [[t('fields.slug'), fields.slug] as [string, string]] : []),
         ...(fields.author ? [[t('fields.author'), fields.author] as [string, string]] : []),
+        ...(reviewer ? [[tEditor('reviewer.title'), reviewer.name] as [string, string]] : []),
         ...(fields.featuredImage
           ? [[t('fields.featuredImage'), fields.featuredImage] as [string, string]]
           : []),
@@ -313,6 +318,7 @@ export function ExportDialog({
       description: fields.metaDescription,
       slug: fields.slug,
       author: fields.author,
+      reviewedBy: reviewer?.name ?? '',
       // As Before you publish's JSON-LD: a live page keeps its published
       // date (a site's "date"), and today is when it was updated.
       ...(isNew ? { date: localDate(new Date()) } : { lastmod: localDate(new Date()) }),
@@ -322,6 +328,7 @@ export function ExportDialog({
       title: fields.metaTitle,
       description: fields.metaDescription,
       author: fields.author,
+      reviewedBy: reviewer?.name ?? '',
     },
   };
   const download = async (format: DraftExportFormat) => {
@@ -428,6 +435,11 @@ export function ExportDialog({
       shown: fields.author
         ? t(byline ? 'fields.authorInContent' : 'fields.authorValue', { name: fields.author })
         : t(siteAuthor ? 'fields.siteAuthor' : 'fields.noAuthor'),
+    },
+    {
+      label: tEditor('reviewer.title'),
+      value: reviewer?.name ?? null,
+      shown: reviewer?.name ?? tEditor('reviewer.none'),
     },
     {
       label: t('fields.featuredImage'),

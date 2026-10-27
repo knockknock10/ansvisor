@@ -3,6 +3,7 @@ import type { AuthorsRead, ContentAuthor } from '@/lib/content/authors';
 import { publishableHtml } from '@/lib/content/clean-html';
 import {
   bylineText,
+  reviewerLineText,
   exportPlaceholders,
   fragment,
   pageFields,
@@ -30,6 +31,7 @@ export interface CmsPage {
   metaDescription: string;
   html: string;
   author: string | null;
+  reviewedBy: string | null;
   featuredImage: { src: string; alt: string } | null;
 }
 
@@ -120,11 +122,15 @@ export interface CmsSource {
   html: string;
   sourceUrl: string | null;
   author: ContentAuthor | null;
+  /** The selected qualified reviewer from Authors, when assigned to the draft. */
+  reviewer: ContentAuthor | null;
   /**
    * The brand's team in the page's language, for the CMS's author field when
    * the page has no author (teamName); empty while the authors aren't read.
    */
   teamByline: string;
+  /** The selected qualified reviewer, if one is set and Authors were read. */
+  reviewedBy: string | null;
   /** The byline line the brand puts in the content, or null. */
   byline: string | null;
 }
@@ -154,16 +160,27 @@ export function cmsSource({
 }): CmsSource {
   const language = page.language ?? brandLanguage;
   const author = authors?.authors.find((a) => a.id === page.authorId) ?? null;
+  // The Library uses the reviewer's explicit assignment; it must not start
+  // another AI-backed page read merely to reconstruct the editor's state.
+  const reviewer = authors?.authors.find((a) => a.id === page.reviewerId) ?? null;
   const inContent = authors?.brands.find((b) => b.id === brandId)?.bylineInContent ?? false;
   const confirmed = !author && page.authorConfirmed;
+  const authorByline =
+    inContent && !confirmed ? bylineText(language, author?.name ?? null, brandName) : null;
+  const reviewerByline = reviewer ? reviewerLineText(language, reviewer.name) : null;
+  const byline =
+    [authorByline, reviewerByline].filter((line): line is string => Boolean(line)).join(' · ') ||
+    null;
   return {
     draftId: page.id,
     title: page.title,
     html: publishableHtml(page.bodyHtml),
     sourceUrl: page.sourceUrl,
     author,
+    reviewer,
+    reviewedBy: reviewer?.name ?? null,
     teamByline: authors && !confirmed ? teamName(language, brandName) : '',
-    byline: inContent && !confirmed ? bylineText(language, author?.name ?? null, brandName) : null,
+    byline,
   };
 }
 
@@ -182,6 +199,7 @@ export function cmsPage({
   html,
   fields,
   page,
+  reviewedBy = null,
   byline,
 }: {
   draftId: string;
@@ -190,6 +208,8 @@ export function cmsPage({
   fields: CmsFields;
   /** pageFields' read of the page: its author and featured image. */
   page: PageFields;
+  /** The selected qualified reviewer, if any. */
+  reviewedBy?: string | null;
   /** The byline line the brand puts in the content, or null. */
   byline: string | null;
 }): CmsPage {
@@ -204,6 +224,7 @@ export function cmsPage({
     metaDescription: fields.metaDescription.trim(),
     html: withoutLeadingH1(withLine),
     author: page.author.trim().slice(0, AUTHOR_MAX) || null,
+    reviewedBy: reviewedBy?.trim().slice(0, AUTHOR_MAX) || null,
     featuredImage: image ? { src: image, alt: altOf(html, image).slice(0, ALT_MAX) } : null,
   };
 }
@@ -256,7 +277,17 @@ export function bulkCmsItems(
       draftId,
       title,
       problem,
-      page: problem ? null : cmsPage({ draftId, title, html, fields, page, byline: source.byline }),
+      page: problem
+        ? null
+        : cmsPage({
+            draftId,
+            title,
+            html,
+            fields,
+            page,
+            reviewedBy: source.reviewedBy,
+            byline: source.byline,
+          }),
     };
   });
 }

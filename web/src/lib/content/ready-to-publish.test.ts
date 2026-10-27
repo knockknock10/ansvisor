@@ -5,6 +5,7 @@ import { PLACEHOLDER } from './placeholders';
 import {
   blankCode,
   bylineText,
+  reviewerLineText,
   disclosureText,
   exportPlaceholders,
   fragment,
@@ -386,6 +387,16 @@ describe('bylineText', () => {
   it('puts the name alone, or the brand alone, for a language not in the table', () => {
     expect(bylineText('ja', '山田太郎', 'Acme')).toBe('山田太郎');
     expect(bylineText('ar', null, 'Acme')).toBe('Acme');
+  });
+});
+
+describe('reviewerLineText', () => {
+  it('names the reviewer in the page language, with a clear English fallback', () => {
+    expect(reviewerLineText(null, 'Grace Hopper')).toBe('Reviewed by Grace Hopper');
+    expect(reviewerLineText('tr', 'Ayşe Yılmaz')).toBe('Ayşe Yılmaz tarafından incelendi');
+    expect(reviewerLineText('de', 'Grace Hopper')).toBe('Geprüft von Grace Hopper');
+    expect(reviewerLineText('ja', '山田太郎')).toBe('Reviewed by 山田太郎');
+    expect(reviewerLineText('en', 'A$1')).toBe('Reviewed by A$1');
   });
 });
 

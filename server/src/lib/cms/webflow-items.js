@@ -237,6 +237,10 @@ export function fieldDataFor({ page, slug, body, jsonLd }, fieldMap) {
   if (fieldMap.metaDescription) {
     data[fieldMap.metaDescription] = squash(page.metaDescription) || openingWords(body);
   }
+  if (fieldMap.reviewedBy) {
+    // Reviewer is optional; an empty value clears an old reviewer on resend.
+    data[fieldMap.reviewedBy] = squash(page.reviewedBy ?? '').slice(0, NAME_CHARS);
+  }
   if (fieldMap.jsonLd) {
     // Every "<" escaped: nothing in it can end or open a tag in the embed's script.
     data[fieldMap.jsonLd] = jsonLd?.length

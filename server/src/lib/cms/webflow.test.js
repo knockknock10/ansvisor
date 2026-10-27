@@ -134,6 +134,15 @@ describe('suggestFieldMap', () => {
     });
   });
 
+  it('suggests the Webflow reviewer field when its name identifies it', () => {
+    expect(
+      suggestFieldMap([
+        ...blog,
+        { slug: 'reviewed-by', name: 'Reviewed By', type: 'PlainText' },
+      ]),
+    ).toMatchObject({ reviewedBy: 'reviewed-by' });
+  });
+
   it('falls back to the first rich text for the body, and never suggests a field of another type', () => {
     expect(
       suggestFieldMap([

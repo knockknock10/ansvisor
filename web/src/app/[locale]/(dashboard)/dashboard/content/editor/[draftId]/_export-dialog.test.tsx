@@ -64,6 +64,7 @@ async function render(over: Partial<Parameters<typeof ExportDialog>[0]> = {}) {
           isNew
           sourceUrl={null}
           author={ada}
+          reviewer={null}
           teamByline="Acme Team"
           byline={null}
           checks={checks}
@@ -300,10 +301,38 @@ describe('ExportDialog', () => {
       'Meta descriptionBrew it slowly.Copy',
       'Slugpour-overCopy',
       'AuthorAda Lovelace → your CMS author fieldCopy',
+      'Reviewed byNo reviewer',
       'Featured imageNone in the page',
     ]);
     await act(async () => button('Copy Author')!.click());
     expect(writeText).toHaveBeenCalledWith('Ada Lovelace');
+  });
+
+  it('includes a selected reviewer in copyable and downloaded metadata', async () => {
+    await render({
+      initialDestination: 'docx',
+      reviewer: { id: 'r1', name: 'Grace Hopper', title: 'Doctor' } as ContentAuthor,
+      byline: 'Reviewed by Grace Hopper',
+    });
+    const reviewedBy = [...dialog().querySelectorAll('[aria-label="Page fields"] dl > div')].find(
+      (row) => row.textContent?.startsWith('Reviewed by'),
+    );
+    expect(reviewedBy?.textContent).toContain('Reviewed byGrace HopperCopy');
+    await act(async () => button('Copy Reviewed by')!.click());
+    expect(writeText).toHaveBeenCalledWith('Grace Hopper');
+    await act(async () => button('Download Word')!.click());
+    expect(draftExportBlob).toHaveBeenCalledWith(
+      'docx',
+      'Pour-over',
+      expect.stringContaining('<p>Reviewed by Grace Hopper</p>'),
+      expect.objectContaining({
+        table: expect.objectContaining({
+          rows: expect.arrayContaining([['Reviewed by', 'Grace Hopper']]),
+        }),
+        front: expect.objectContaining({ reviewedBy: 'Grace Hopper' }),
+        head: expect.objectContaining({ reviewedBy: 'Grace Hopper' }),
+      }),
+    );
   });
 
   it('downloads Word and Markdown with the page fields, and remembers the destination', async () => {

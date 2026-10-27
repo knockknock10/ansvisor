@@ -13,6 +13,7 @@ const PART_TYPES = {
   body: ['RichText'],
   metaTitle: ['PlainText'],
   metaDescription: ['PlainText'],
+  reviewedBy: ['PlainText'],
   jsonLd: ['PlainText'],
 };
 const PAGE_PARTS = Object.keys(PART_TYPES);
@@ -233,6 +234,7 @@ const HINTS = {
   body: [/(^|-)(post-)?body($|-)/, /content/, /article/, /rich/],
   metaTitle: [/(meta|seo)-?title/],
   metaDescription: [/(meta|seo)-?desc/, /summary/, /excerpt/, /description/],
+  reviewedBy: [/reviewed[- ]?by/, /reviewer/],
   jsonLd: [/json-?ld/, /schema/, /structured/],
 };
 
