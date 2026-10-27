@@ -80,8 +80,17 @@ describe('classifyMerchant', () => {
       null,
     ],
     ['Temu', 'https://www.temu.com/product.html?goods_id=123', 'temu', null],
-    ['Trendyol', 'https://www.trendyol.com/brand/p-123?boutiqueId=2', 'trendyol', null],
-    ['Hepsiburada', 'https://www.hepsiburada.com/product-p-123', 'hepsiburada', null],
+    ['Trendyol product', 'https://www.trendyol.com/brand/p-123?boutiqueId=2', 'trendyol', '123'],
+    ['Trendyol product ID before trailing slug', 'https://www.trendyol.com/brand-p-123-extra', 'trendyol', '123'],
+    ['Hepsiburada product', 'https://www.hepsiburada.com/product-p-123', 'hepsiburada', '123'],
+    ['Trendyol category page', 'https://www.trendyol.com/sr?wc=109470', 'trendyol', null],
+    ['Hepsiburada category page', 'https://www.hepsiburada.com/kadin', 'hepsiburada', null],
+    [
+      'Hepsiburada alphanumeric product ID',
+      'https://www.hepsiburada.com/example-product-p-HBCV00008749EE',
+      'hepsiburada',
+      'HBCV00008749EE',
+    ],
   ])('classifies %s', (_label, url, marketplace, listingId) => {
     expect(classifyMerchant(url)).toEqual({ kind: 'marketplace', marketplace, listingId });
   });

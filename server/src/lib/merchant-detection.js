@@ -169,6 +169,12 @@ function listingIdFor(marketplace, pathname) {
     return index >= 0 && /^\d+$/.test(id ?? '') ? id : null;
   }
 
+  if (marketplace === 'trendyol' || marketplace === 'hepsiburada') {
+    // Both marketplaces put the listing identifier in a p-<id> path segment.
+    const match = pathname.match(/(?:^|[/-])p-([a-z\d]+)(?=$|[./-])/i);
+    return match ? match[1] : null;
+  }
+
   return null;
 }
 
