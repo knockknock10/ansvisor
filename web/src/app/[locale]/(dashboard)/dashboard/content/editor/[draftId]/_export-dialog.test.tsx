@@ -64,6 +64,7 @@ async function render(over: Partial<Parameters<typeof ExportDialog>[0]> = {}) {
           isNew
           sourceUrl={null}
           author={ada}
+          reviewer={null}
           teamByline="Acme Team"
           byline={null}
           checks={checks}

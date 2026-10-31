@@ -55,6 +55,7 @@ export function SendDialog({
   html,
   sourceUrl,
   author,
+  reviewer,
   teamByline,
   byline,
   onFillNow,
@@ -68,6 +69,8 @@ export function SendDialog({
   html: string;
   sourceUrl: string | null;
   author: ContentAuthor | null;
+  /** The qualified reviewer, distinct from the page author. */
+  reviewer: ContentAuthor | null;
   /** The brand's team in the page's language (teamName); empty while the authors aren't read. */
   teamByline: string;
   /** The byline line the brand puts in the content, or null. */
@@ -83,8 +86,8 @@ export function SendDialog({
   const { openUpgrade } = useUpgradeGate();
   const format = useFormatter();
   const page = useMemo(
-    () => pageFields({ title, html, sourceUrl, author, teamByline }),
-    [title, html, sourceUrl, author, teamByline],
+    () => pageFields({ title, html, sourceUrl, author, reviewer, teamByline }),
+    [title, html, sourceUrl, author, reviewer, teamByline],
   );
   const placeholders = useMemo(
     () => exportPlaceholders(html) + titlePlaceholders(title, html),
@@ -173,7 +176,7 @@ export function SendDialog({
     setProblem(null);
     const result = await sendPagesToCms(
       brandId,
-      [cmsPage({ draftId, title, html, fields, page, byline })],
+      [cmsPage({ draftId, title, html, fields, page, byline, reviewer })],
       target,
     );
     setSending(false);

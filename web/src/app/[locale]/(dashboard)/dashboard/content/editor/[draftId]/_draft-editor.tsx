@@ -4354,6 +4354,7 @@ export function DraftEditor({
           isNew={draft.method === 'create'}
           sourceUrl={draft.sourceUrl}
           author={pageAuthor}
+          reviewer={pageReviewer}
           teamByline={teamByline}
           siteAuthor={!pageAuthor && authorConfirmed.real}
           byline={contentByline}
@@ -4401,6 +4402,7 @@ export function DraftEditor({
           html={sendOpen.html}
           sourceUrl={draft.sourceUrl}
           author={pageAuthor}
+          reviewer={pageReviewer}
           teamByline={teamByline}
           byline={contentByline}
           onFillNow={() => {
@@ -4441,6 +4443,8 @@ export function DraftEditor({
           }}
           onClose={() => setPublishOpen(null)}
           quality={quality}
+          reviewer={regulated ? pageReviewer : null}
+          reviewerRequired={regulated !== null}
           title={title}
           isNew={draft.method === 'create'}
           pageType={pageType}

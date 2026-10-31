@@ -54,6 +54,7 @@ async function render(over: Partial<Parameters<typeof SendDialog>[0]> = {}) {
           html={HTML}
           sourceUrl={null}
           author={ada}
+          reviewer={null}
           teamByline="Acme Team"
           byline={null}
           onFillNow={onFillNow}
@@ -132,6 +133,7 @@ describe('SendDialog', () => {
           // The brand's byline line stays; the CMS's title field carries the H1.
           html: '<p>By Ada Lovelace</p>\n<p>Brew it slowly.</p>',
           author: 'Ada Lovelace',
+          reviewer: null,
           featuredImage: null,
         },
       ],
@@ -142,6 +144,25 @@ describe('SendDialog', () => {
     // The editor's header says where it went.
     expect(onSent).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'sent', target: 'webhook', error: null }),
+    );
+  });
+
+  it('sends a qualified reviewer separately from the page author', async () => {
+    const reviewer = {
+      id: 'r1',
+      name: 'Dr. Grace Hopper',
+      title: 'Clinical Reviewer',
+    } as ContentAuthor;
+    await render({ reviewer });
+    await act(async () => button('Send').click());
+    expect(sendPagesToCms).toHaveBeenCalledWith(
+      'brand-1',
+      [expect.objectContaining({
+        author: 'Ada Lovelace',
+        reviewer: 'Dr. Grace Hopper, Clinical Reviewer',
+        html: expect.stringContaining('"reviewedBy"'),
+      })],
+      'webhook',
     );
   });
 

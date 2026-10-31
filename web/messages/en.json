@@ -7689,6 +7689,8 @@
           "metaDescription": "Meta description",
           "slug": "Slug",
           "author": "Author",
+          "reviewer": "Reviewed by",
+          "noReviewer": "No reviewer selected",
           "authorValue": "{name} → your CMS author field",
           "authorInContent": "{name} → in the content, under the H1 (Add byline to content)",
           "featuredImage": "Featured image",
@@ -7765,6 +7767,15 @@
           "confirmedDetail": "You confirmed the page's author is a real person your site names. Check your CMS sets them as the author.",
           "brand": "Your brand's byline",
           "brandDetail": "This page type goes out under {byline}: it needs no author."
+        },
+        "reviewer": {
+          "title": "Qualified reviewer",
+          "named": "Qualified reviewer: {name}",
+          "namedDetail": "The reviewer is included in export metadata. CMS reviewer fields and WebPage structured data are sent where the destination supports them or fields are mapped; check that your CMS template displays the reviewer to readers.",
+          "none": "No qualified reviewer named",
+          "noneDetail": "Choose a qualified person from Authors. Their name and credential will be included in export metadata, supported CMS fields, and WebPage structured data.",
+          "unknown": "The Authors list is still loading, so the reviewer hasn't been confirmed.",
+          "schemaNote": "The WebPage node identifies this qualified reviewer separately from the Article author."
         },
         "dates": {
           "title": "Visible published and updated dates",
@@ -11807,6 +11818,7 @@
         "metaTitle": "Meta title",
         "metaDescription": "Meta description",
         "jsonLd": "JSON-LD (structured data)",
+        "reviewer": "Qualified reviewer",
         "date": "Date (the day it's first sent)"
       },
       "notSent": "Not sent",
@@ -11942,7 +11954,8 @@
         "body": "Page content (formatted text)",
         "metaTitle": "Meta title",
         "metaDescription": "Meta description",
-        "jsonLd": "JSON-LD (structured data)"
+        "jsonLd": "JSON-LD (structured data)",
+        "reviewer": "Qualified reviewer"
       },
       "notSent": "Not sent",
       "pickField": "Pick a field",
