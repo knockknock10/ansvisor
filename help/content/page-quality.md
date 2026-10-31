@@ -1,10 +1,10 @@
 ---
 title: Check a page's Quality in the Content Editor
 route: /dashboard/content/editor
-keywords: [quality score, e-e-a-t, trust, readability, hand off, next step, before you publish, page author]
-synonyms: [content quality, quality check, page score, eeat score, ready to publish checklist]
+keywords: [quality score, e-e-a-t, trust, readability, hand off, next step, before you publish, page author, qualified reviewer, reviewer, reviewed by]
+synonyms: [content quality, quality check, page score, eeat score, ready to publish checklist, content reviewer, regulated page review]
 plan: all
-updated: 2026-10-29
+updated: 2026-10-31
 last_checked: 2026-10-29
 owner: Cihan
 app_version: 0.3.0
@@ -38,7 +38,7 @@ Once the page is ready, **Next step** also offers **Mark published**.
 
 ## The page's author
 
-The header shows the page's author, picked from **Settings › Authors**. Authors are real people only: the Content Agent can't add or invent them. For a page that advises on health, money or the law, the header also shows the qualified person who reviewed it.
+The header shows the page's author, picked from **Settings › Authors**. Authors are real people only: the Content Agent can't add or invent them. The reviewer is a separate person from the author, also picked from **Settings › Authors**. For a page that advises on health, money or the law, choose its qualified reviewer in the header.
 
 ## Before you publish
 
@@ -46,14 +46,15 @@ The header shows the page's author, picked from **Settings › Authors**. Author
 
 - placeholders, alt text and links;
 - the author;
+- the qualified reviewer on pages that advise on health, money or the law;
 - visible dates;
 - the structured data to paste, if your CMS doesn't add it;
 - a warning when Trust is under 60.
 
-On a page with a shopping path, it also names the product cards whose price has changed in your catalog since they went in. **Send to CMS** opens it only when it has something to ask about.
+The structured data you can copy includes the selected reviewer separately from the page's author. On a page with a shopping path, **Before you publish** also names product cards whose price has changed in your catalog since they went in. **Send to CMS** opens it only when it has something to ask about.
 
 ## Export with Quality on
 
-**Export** opens a dialog: the same files as without Quality, and under **Platforms** a copy of the page to paste into Webflow, WordPress, Shopify or Google Docs.
+**Export** opens a dialog: the same files as without Quality, and under **Platforms** a copy of the page to paste into Webflow, WordPress, Shopify or Google Docs. When a regulated page has a reviewer, the files also carry **Reviewed by** as metadata, separately from the author and page text.
 
 If placeholders are still open, Export asks first: **Fill now**, or **Export without them**, which leaves out the sentences with a placeholder. One in the title or a heading has to be filled.
